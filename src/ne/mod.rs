@@ -1,6 +1,7 @@
 use log::debug;
 use std::io::{self, Read, Seek, SeekFrom};
 
+use self::entry_table::EntryTable;
 use self::header::NeHeader;
 use self::module_reference_table::ModuleReferenceTable;
 use self::resident_name_table::ResidentNameTable;
@@ -8,6 +9,7 @@ use self::resource_table::NeResourceTable;
 use self::segment_table::NeSegment;
 use crate::mz::DosHeader;
 
+pub mod entry_table;
 pub mod header;
 pub mod module_reference_table;
 pub mod resident_name_table;
@@ -23,6 +25,7 @@ pub struct NeExecutable {
     pub resource_table: NeResourceTable,
     pub resident_name_table: ResidentNameTable,
     pub module_reference_table: ModuleReferenceTable,
+    pub entry_table: EntryTable,
 }
 
 impl NeExecutable {
@@ -65,6 +68,10 @@ impl NeExecutable {
         let int_offset = dos_header.lfanew as u64 + ne_header.import_name_table_offset as u64;
         module_reference_table.read_names(file, int_offset)?;
 
+        let et_offset = dos_header.lfanew as u64 + ne_header.entry_table_offset as u64;
+        let entry_table = EntryTable::read(file, et_offset, ne_header.entry_table_length)?;
+        debug!("entry_table = {:#?}", entry_table);
+
         for segment in &mut segment_entries {
             segment.read_data(file)?;
         }
@@ -76,6 +83,7 @@ impl NeExecutable {
             resource_table,
             resident_name_table,
             module_reference_table,
+            entry_table,
         })
     }
 
@@ -193,6 +201,36 @@ impl NeExecutable {
         println!("Module references:");
         for entry in &self.module_reference_table.entries {
             println!("    {}", String::from_utf8_lossy(&entry.name));
+        }
+
+        for (i, bundle) in self.entry_table.bundles.iter().enumerate() {
+            use self::entry_table::EntryBundle::*;
+            match bundle {
+                Unused => {
+                    println!("Bundle #{}: unused", i);
+                }
+                Fixed(bundle) => {
+                    println!("Bundle #{}: fixed({})", i, bundle.segment);
+                    for (j, entry) in bundle.entries.iter().enumerate() {
+                        println!("    Entry #{}:", j);
+                        println!("        Flags: 0x{:02X}", entry.flags);
+                        println!("        Offset: 0x{:04X}", entry.offset);
+                    }
+                }
+                Moveable(bundle) => {
+                    println!("Bundle #{}: moveable", i);
+                    for (j, entry) in bundle.entries.iter().enumerate() {
+                        println!("    Entry #{}:", j);
+                        println!("        Flags: 0x{:02X}", entry.flags);
+                        println!("        <Unknown field>: 0x{:02X}", entry.unknown);
+                        if entry.magic != 0x3F {
+                            println!("        <Invalid magic>: 0x{:02X}", entry.magic);
+                        }
+                        println!("        Segment: 0x{:02X}", entry.segment);
+                        println!("        Offset: 0x{:04X}", entry.offset);
+                    }
+                }
+            }
         }
 
         for (i, segment) in segment_entries.iter().enumerate() {
