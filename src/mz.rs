@@ -1,6 +1,7 @@
 use std::convert::TryInto;
 use std::io::{self, Read};
 
+/// The DOS header.
 #[derive(Debug, Clone, Copy)]
 pub struct DosHeader {
     /// MZ Header signature
