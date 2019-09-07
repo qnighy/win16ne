@@ -36,7 +36,7 @@ impl NeExecutable {
         ))?;
 
         let segment_entries = (0..ne_header.segment_count)
-            .map(|_| NeSegment::read(file))
+            .map(|_| NeSegment::read(file, ne_header.file_alignment_shift_count))
             .collect::<Result<Vec<_>, _>>()?;
         debug!("segment_entries = {:#?}", segment_entries);
 
@@ -144,10 +144,10 @@ impl NeExecutable {
             println!("Segment #{}:", i);
             println!(
                 "    Offset on file: 0x{:04X}",
-                segment.data_offset(&ne_header)
+                segment.data_offset()
             );
             println!("    Length on file: 0x{:04X}", segment.data_length());
-            println!("    Flags: 0x{:04X}", segment.flags);
+            println!("    Flags: 0x{:04X}", segment.header.flags);
             println!("    Allocation: 0x{:04X}", segment.min_alloc());
         }
     }
