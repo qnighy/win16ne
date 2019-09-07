@@ -35,7 +35,7 @@ impl NeExecutable {
             dos_header.lfanew as u64 + ne_header.segment_table_offset as u64,
         ))?;
 
-        let segment_entries = (0..ne_header.segment_count)
+        let mut segment_entries = (0..ne_header.segment_count)
             .map(|_| NeSegment::read(file, ne_header.file_alignment_shift_count))
             .collect::<Result<Vec<_>, _>>()?;
         debug!("segment_entries = {:#?}", segment_entries);
@@ -44,6 +44,10 @@ impl NeExecutable {
         file.seek(SeekFrom::Start(rt_offset))?;
         let resource_table = NeResourceTable::read(file, ne_header.resource_table_entries)?;
         debug!("resource_table = {:#?}", resource_table);
+
+        for segment in &mut segment_entries {
+            segment.read_data(file)?;
+        }
 
         Ok(Self {
             dos_header: Box::new(dos_header),
@@ -146,6 +150,35 @@ impl NeExecutable {
             println!("    Length on file: 0x{:04X}", segment.data_length());
             println!("    Flags: 0x{:04X}", segment.header.flags);
             println!("    Allocation: 0x{:04X}", segment.min_alloc());
+        }
+
+        for (i, segment) in segment_entries.iter().enumerate() {
+            println!("Segment #{} data:", i);
+            for (i, chunk) in segment.data.chunks(16).enumerate() {
+                print!("{:08X} ", i * 16);
+                for j in 0..16 {
+                    if let Some(x) = chunk.get(j) {
+                        print!(" {:02X}", x);
+                    } else {
+                        print!("   ");
+                    }
+                    if j == 7 {
+                        print!(" ");
+                    }
+                }
+                print!("  |");
+                for &byte in chunk {
+                    if 0x20 <= byte && byte < 0x7F {
+                        print!("{}", byte as char);
+                    } else {
+                        print!(".");
+                    }
+                }
+                print!("|");
+                println!();
+            }
+            println!("{:08X}", (segment.data.len() + 15) / 16 * 16);
+            println!();
         }
     }
 }

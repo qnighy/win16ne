@@ -1,11 +1,12 @@
 use std::convert::TryInto;
-use std::io::{self, Read};
+use std::io::{self, Read, Seek, SeekFrom};
 
 /// The New Executable segment table entry.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct NeSegment {
     pub header: NeSegmentHeader,
     pub shift_count: u16,
+    pub data: Vec<u8>,
 }
 
 impl NeSegment {
@@ -13,7 +14,17 @@ impl NeSegment {
         Ok(Self {
             header: NeSegmentHeader::read(r)?,
             shift_count,
+            data: Vec::default(),
         })
+    }
+
+    pub fn read_data<R: Read + Seek>(&mut self, r: &mut R) -> io::Result<()> {
+        let data_offset = self.data_offset();
+        let data_length = self.data_length();
+        r.seek(SeekFrom::Start(data_offset))?;
+        self.data.resize(data_length as usize, 0);
+        r.read_exact(&mut self.data)?;
+        Ok(())
     }
 
     pub fn data_offset(&self) -> u64 {
