@@ -1,5 +1,5 @@
-use std::io::{self, Read};
 use std::convert::TryInto;
+use std::io::{self, Read};
 
 #[derive(Debug, Clone, Copy)]
 pub struct DosHeader {
@@ -47,12 +47,8 @@ impl DosHeader {
     pub fn read<R: Read>(r: &mut R) -> io::Result<Self> {
         let mut buf = [0; 0x40];
         r.read_exact(&mut buf)?;
-        let get_u16 = |pos| {
-            u16::from_le_bytes(buf[pos..pos+2].try_into().unwrap())
-        };
-        let get_u32 = |pos| {
-            u32::from_le_bytes(buf[pos..pos+4].try_into().unwrap())
-        };
+        let get_u16 = |pos| u16::from_le_bytes(buf[pos..pos + 2].try_into().unwrap());
+        let get_u32 = |pos| u32::from_le_bytes(buf[pos..pos + 4].try_into().unwrap());
 
         Ok(Self {
             magic: get_u16(0),
@@ -69,12 +65,7 @@ impl DosHeader {
             cs: get_u16(0x16),
             lfarlc: get_u16(0x18),
             ovno: get_u16(0x1A),
-            res: [
-                get_u16(0x1C),
-                get_u16(0x1E),
-                get_u16(0x20),
-                get_u16(0x22),
-            ],
+            res: [get_u16(0x1C), get_u16(0x1E), get_u16(0x20), get_u16(0x22)],
             oemid: get_u16(0x24),
             oeminfo: get_u16(0x26),
             res2: [
@@ -111,7 +102,10 @@ impl DosHeader {
             pos += 2;
         }
         if sum != 0 {
-            return Err(io::Error::new(io::ErrorKind::InvalidInput, format!("invalid checksum: 0x{:04x}", sum)));
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                format!("invalid checksum: 0x{:04x}", sum),
+            ));
         }
         Ok(())
     }

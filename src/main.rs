@@ -1,6 +1,6 @@
-use std::io::{self, Read, BufReader, Cursor, Seek, SeekFrom};
-use std::fs::File;
 use std::convert::TryInto;
+use std::fs::File;
+use std::io::{self, BufReader, Cursor, Read, Seek, SeekFrom};
 
 use log::debug;
 
@@ -31,7 +31,10 @@ fn main() -> io::Result<()> {
     ne_header.check_magic()?;
     println!("File Type: Windows New Executable");
     println!("Header:");
-    println!("    Linker version: {}.{}", ne_header.major_linker_version, ne_header.minor_linker_version);
+    println!(
+        "    Linker version: {}.{}",
+        ne_header.major_linker_version, ne_header.minor_linker_version
+    );
     print!("    Flags: ");
     {
         let mut flag_found = false;
@@ -61,16 +64,39 @@ fn main() -> io::Result<()> {
         }
     }
     println!();
-    println!("    Auto-data segment: {}", ne_header.auto_data_segment_index);
+    println!(
+        "    Auto-data segment: {}",
+        ne_header.auto_data_segment_index
+    );
     println!("    Initial heap size: {}", ne_header.init_heap_size);
     println!("    Initial stack size: {}", ne_header.init_stack_size);
-    println!("    Entry point (CS:IP): {:04X}:{:04X}", ne_header.entry_point >> 16, ne_header.entry_point & 0xFFFF);
-    println!("    Initial stack (SS:SP): {:04X}:{:04X}", ne_header.init_stack >> 16, ne_header.init_stack & 0xFFFF);
+    println!(
+        "    Entry point (CS:IP): {:04X}:{:04X}",
+        ne_header.entry_point >> 16,
+        ne_header.entry_point & 0xFFFF
+    );
+    println!(
+        "    Initial stack (SS:SP): {:04X}:{:04X}",
+        ne_header.init_stack >> 16,
+        ne_header.init_stack & 0xFFFF
+    );
     println!("    Number of segments: {}", ne_header.segment_count);
-    println!("    Number of referenced modules: {}", ne_header.module_references);
-    println!("    Number of movable entry points: {}", ne_header.movable_entry_point_count);
-    println!("    Number of file alignment shifts: {}", ne_header.file_alignment_shift_count);
-    println!("    Number of resource table entries: {}", ne_header.resource_table_entries);
+    println!(
+        "    Number of referenced modules: {}",
+        ne_header.module_references
+    );
+    println!(
+        "    Number of movable entry points: {}",
+        ne_header.movable_entry_point_count
+    );
+    println!(
+        "    Number of file alignment shifts: {}",
+        ne_header.file_alignment_shift_count
+    );
+    println!(
+        "    Number of resource table entries: {}",
+        ne_header.resource_table_entries
+    );
     print!("    Target os: ");
     if ne_header.target_os == 2 {
         print!("Windows");
@@ -78,15 +104,21 @@ fn main() -> io::Result<()> {
         print!("Unknown ({})", ne_header.target_os);
     }
     println!();
-    println!("    Expected Windows version: {}.{}", ne_header.expected_win_ver[1], ne_header.expected_win_ver[0]);
+    println!(
+        "    Expected Windows version: {}.{}",
+        ne_header.expected_win_ver[1], ne_header.expected_win_ver[0]
+    );
 
-    let segment_table = (0..ne_header.segment_count).map(|_| {
-        NeSegment::read(&mut cursor)
-    }).collect::<Result<Vec<_>, _>>()?;
+    let segment_table = (0..ne_header.segment_count)
+        .map(|_| NeSegment::read(&mut cursor))
+        .collect::<Result<Vec<_>, _>>()?;
     debug!("segment_table = {:#?}", segment_table);
     for (i, segment) in segment_table.iter().enumerate() {
         println!("Segment #{}:", i);
-        println!("    Offset on file: 0x{:04X}", segment.data_offset(&ne_header));
+        println!(
+            "    Offset on file: 0x{:04X}",
+            segment.data_offset(&ne_header)
+        );
         println!("    Length on file: 0x{:04X}", segment.data_length());
         println!("    Flags: 0x{:04X}", segment.flags);
         println!("    Allocation: 0x{:04X}", segment.min_alloc());
@@ -119,7 +151,7 @@ pub struct NeHeader {
     pub non_resident_names_table_offset: u32,
     pub movable_entry_point_count: u16,
     pub file_alignment_shift_count: u16,
-    pub resource_table_entries:  u16,
+    pub resource_table_entries: u16,
     pub target_os: u8,
     pub os2_exe_flags: u8,
     pub return_thunk_offset: u16,
@@ -133,12 +165,8 @@ impl NeHeader {
         let mut buf = [0; 0x40];
         r.read_exact(&mut buf)?;
         let get_u8 = |pos| buf[pos];
-        let get_u16 = |pos| {
-            u16::from_le_bytes(buf[pos..pos+2].try_into().unwrap())
-        };
-        let get_u32 = |pos| {
-            u32::from_le_bytes(buf[pos..pos+4].try_into().unwrap())
-        };
+        let get_u16 = |pos| u16::from_le_bytes(buf[pos..pos + 2].try_into().unwrap());
+        let get_u32 = |pos| u32::from_le_bytes(buf[pos..pos + 4].try_into().unwrap());
 
         Ok(Self {
             magic: [get_u8(0), get_u8(1)],
@@ -164,7 +192,7 @@ impl NeHeader {
             non_resident_names_table_offset: get_u32(0x2C),
             movable_entry_point_count: get_u16(0x30),
             file_alignment_shift_count: get_u16(0x32),
-            resource_table_entries:  get_u16(0x34),
+            resource_table_entries: get_u16(0x34),
             target_os: get_u8(0x36),
             os2_exe_flags: get_u8(0x37),
             return_thunk_offset: get_u16(0x38),
@@ -193,9 +221,7 @@ impl NeSegment {
     pub fn read<R: Read>(r: &mut R) -> io::Result<Self> {
         let mut buf = [0; 0x8];
         r.read_exact(&mut buf)?;
-        let get_u16 = |pos| {
-            u16::from_le_bytes(buf[pos..pos+2].try_into().unwrap())
-        };
+        let get_u16 = |pos| u16::from_le_bytes(buf[pos..pos + 2].try_into().unwrap());
 
         Ok(Self {
             data_offset: get_u16(0),
