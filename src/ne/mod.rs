@@ -2,12 +2,14 @@ use log::debug;
 use std::io::{self, Read, Seek, SeekFrom};
 
 use self::header::NeHeader;
+use self::module_reference_table::ModuleReferenceTable;
 use self::resident_name_table::ResidentNameTable;
 use self::resource_table::NeResourceTable;
 use self::segment_table::NeSegment;
 use crate::mz::DosHeader;
 
 pub mod header;
+pub mod module_reference_table;
 pub mod resident_name_table;
 pub mod resource_table;
 pub mod segment_table;
@@ -20,6 +22,7 @@ pub struct NeExecutable {
     pub segment_entries: Vec<NeSegment>,
     pub resource_table: NeResourceTable,
     pub resident_name_table: ResidentNameTable,
+    pub module_reference_table: ModuleReferenceTable,
 }
 
 impl NeExecutable {
@@ -53,6 +56,15 @@ impl NeExecutable {
         let resident_name_table = ResidentNameTable::read(file)?;
         debug!("resident_name_table = {:#?}", resident_name_table);
 
+        let mrt_offset = dos_header.lfanew as u64 + ne_header.module_reference_table_offset as u64;
+        file.seek(SeekFrom::Start(mrt_offset))?;
+        let mut module_reference_table =
+            ModuleReferenceTable::read(file, ne_header.module_references)?;
+        debug!("module_reference_table = {:#?}", module_reference_table);
+
+        let int_offset = dos_header.lfanew as u64 + ne_header.import_name_table_offset as u64;
+        module_reference_table.read_names(file, int_offset)?;
+
         for segment in &mut segment_entries {
             segment.read_data(file)?;
         }
@@ -63,6 +75,7 @@ impl NeExecutable {
             segment_entries,
             resource_table,
             resident_name_table,
+            module_reference_table,
         })
     }
 
@@ -176,6 +189,10 @@ impl NeExecutable {
                     String::from_utf8_lossy(&entry.name)
                 );
             }
+        }
+        println!("Module references:");
+        for entry in &self.module_reference_table.entries {
+            println!("    {}", String::from_utf8_lossy(&entry.name));
         }
 
         for (i, segment) in segment_entries.iter().enumerate() {
