@@ -2,10 +2,12 @@ use log::debug;
 use std::io::{self, Read, Seek, SeekFrom};
 
 use self::header::NeHeader;
+use self::resource_table::NeResourceTable;
 use self::segment_entry::NeSegment;
 use crate::mz::DosHeader;
 
 pub mod header;
+pub mod resource_table;
 pub mod segment_entry;
 
 /// The parsed New Executable binary.
@@ -14,6 +16,7 @@ pub struct NeExecutable {
     pub dos_header: Box<DosHeader>,
     pub ne_header: Box<NeHeader>,
     pub segment_entries: Vec<NeSegment>,
+    pub resource_table: NeResourceTable,
 }
 
 impl NeExecutable {
@@ -37,10 +40,16 @@ impl NeExecutable {
             .collect::<Result<Vec<_>, _>>()?;
         debug!("segment_entries = {:#?}", segment_entries);
 
+        let rt_offset = dos_header.lfanew as u64 + ne_header.resource_table_offset as u64;
+        file.seek(SeekFrom::Start(rt_offset))?;
+        let resource_table = NeResourceTable::read(file, ne_header.resource_table_entries)?;
+        debug!("resource_table = {:#?}", resource_table);
+
         Ok(Self {
             dos_header: Box::new(dos_header),
             ne_header: Box::new(ne_header),
             segment_entries,
+            resource_table,
         })
     }
 
