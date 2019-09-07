@@ -28,6 +28,10 @@ impl NeExecutable {
         debug!("ne_header = {:#?}", ne_header);
         ne_header.check_magic()?;
 
+        file.seek(SeekFrom::Start(
+            dos_header.lfanew as u64 + ne_header.segment_table_offset as u64,
+        ))?;
+
         let segment_entries = (0..ne_header.segment_count)
             .map(|_| NeSegment::read(file))
             .collect::<Result<Vec<_>, _>>()?;
