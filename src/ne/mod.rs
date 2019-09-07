@@ -3,12 +3,12 @@ use std::io::{self, Read, Seek, SeekFrom};
 
 use self::header::NeHeader;
 use self::resource_table::NeResourceTable;
-use self::segment_entry::NeSegment;
+use self::segment_table::NeSegment;
 use crate::mz::DosHeader;
 
 pub mod header;
 pub mod resource_table;
-pub mod segment_entry;
+pub mod segment_table;
 
 /// The parsed New Executable binary.
 #[derive(Debug, Clone)]
