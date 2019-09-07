@@ -2,11 +2,13 @@ use log::debug;
 use std::io::{self, Read, Seek, SeekFrom};
 
 use self::header::NeHeader;
+use self::resident_name_table::ResidentNameTable;
 use self::resource_table::NeResourceTable;
 use self::segment_table::NeSegment;
 use crate::mz::DosHeader;
 
 pub mod header;
+pub mod resident_name_table;
 pub mod resource_table;
 pub mod segment_table;
 
@@ -17,6 +19,7 @@ pub struct NeExecutable {
     pub ne_header: Box<NeHeader>,
     pub segment_entries: Vec<NeSegment>,
     pub resource_table: NeResourceTable,
+    pub resident_name_table: ResidentNameTable,
 }
 
 impl NeExecutable {
@@ -45,6 +48,11 @@ impl NeExecutable {
         let resource_table = NeResourceTable::read(file, ne_header.resource_table_entries)?;
         debug!("resource_table = {:#?}", resource_table);
 
+        let rnt_offset = dos_header.lfanew as u64 + ne_header.resident_names_table_offset as u64;
+        file.seek(SeekFrom::Start(rnt_offset))?;
+        let resident_name_table = ResidentNameTable::read(file)?;
+        debug!("resident_name_table = {:#?}", resident_name_table);
+
         for segment in &mut segment_entries {
             segment.read_data(file)?;
         }
@@ -54,6 +62,7 @@ impl NeExecutable {
             ne_header: Box::new(ne_header),
             segment_entries,
             resource_table,
+            resident_name_table,
         })
     }
 
@@ -150,6 +159,23 @@ impl NeExecutable {
             println!("    Length on file: 0x{:04X}", segment.data_length());
             println!("    Flags: 0x{:04X}", segment.header.flags);
             println!("    Allocation: 0x{:04X}", segment.min_alloc());
+        }
+
+        if self.resident_name_table.entries.is_empty() {
+            println!("No resident name entry");
+        } else {
+            println!(
+                "Module name: {}",
+                String::from_utf8_lossy(&self.resident_name_table.entries[0].name)
+            );
+            println!("Resident names:");
+            for entry in &self.resident_name_table.entries[1..] {
+                println!(
+                    "    {:3} {}",
+                    entry.index,
+                    String::from_utf8_lossy(&entry.name)
+                );
+            }
         }
 
         for (i, segment) in segment_entries.iter().enumerate() {
