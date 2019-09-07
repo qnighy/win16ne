@@ -142,10 +142,7 @@ impl NeExecutable {
 
         for (i, segment) in segment_entries.iter().enumerate() {
             println!("Segment #{}:", i);
-            println!(
-                "    Offset on file: 0x{:04X}",
-                segment.data_offset()
-            );
+            println!("    Offset on file: 0x{:04X}", segment.data_offset());
             println!("    Length on file: 0x{:04X}", segment.data_length());
             println!("    Flags: 0x{:04X}", segment.header.flags);
             println!("    Allocation: 0x{:04X}", segment.min_alloc());

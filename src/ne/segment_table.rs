@@ -10,7 +10,10 @@ pub struct NeSegment {
 
 impl NeSegment {
     pub fn read<R: Read>(r: &mut R, shift_count: u16) -> io::Result<Self> {
-        Ok(Self { header: NeSegmentHeader::read(r)?, shift_count })
+        Ok(Self {
+            header: NeSegmentHeader::read(r)?,
+            shift_count,
+        })
     }
 
     pub fn data_offset(&self) -> u64 {
