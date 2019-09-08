@@ -87,7 +87,7 @@ impl NeExecutable {
         })
     }
 
-    pub(crate) fn describe(&self) {
+    pub(crate) fn describe(&self, show_data: bool) {
         let Self {
             ne_header,
             segment_entries,
@@ -231,6 +231,10 @@ impl NeExecutable {
                     }
                 }
             }
+        }
+
+        if !show_data {
+            return;
         }
 
         for (i, segment) in segment_entries.iter().enumerate() {
