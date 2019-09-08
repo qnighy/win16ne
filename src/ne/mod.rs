@@ -72,7 +72,8 @@ impl NeExecutable {
         module_reference_table.read_names(file, int_offset)?;
 
         let et_offset = dos_header.lfanew as u64 + ne_header.entry_table_offset as u64;
-        let entry_table = EntryTable::read(file, et_offset, ne_header.entry_table_length)?;
+        file.seek(SeekFrom::Start(et_offset))?;
+        let entry_table = EntryTable::read(file, ne_header.entry_table_length)?;
         debug!("entry_table = {:#?}", entry_table);
 
         let nnt_offset = ne_header.non_resident_names_table_offset as u64;
@@ -233,34 +234,29 @@ impl NeExecutable {
             println!("    {}", String::from_utf8_lossy(&entry.name));
         }
 
-        for (i, bundle) in self.entry_table.bundles.iter().enumerate() {
-            use self::entry_table::EntryBundle::*;
-            match bundle {
+        for (i, entry) in self.entry_table.entries.iter().enumerate() {
+            use self::entry_table::SegmentEntry::*;
+            match entry {
                 Unused => {
-                    println!("Bundle #{}: unused", i);
+                    println!("Entry #{}: unused", i + 1);
                 }
-                Fixed(bundle) => {
-                    println!("Bundle #{}: fixed({})", i, bundle.segment);
-                    for (j, entry) in bundle.entries.iter().enumerate() {
-                        println!("    Entry #{}:", j);
-                        println!("        Flags: 0x{:02X}", entry.flags);
-                        println!("        Offset: 0x{:04X}", entry.offset);
-                    }
+                Fixed(entry) => {
+                    println!("Entry #{}: fixed", i + 1);
+                    println!("    Segment: {}", entry.segment);
+                    println!("    Flags: 0x{:02X}", entry.flags);
+                    println!("    Offset: 0x{:04X}", entry.offset);
                 }
-                Moveable(bundle) => {
-                    println!("Bundle #{}: moveable", i);
-                    for (j, entry) in bundle.entries.iter().enumerate() {
-                        println!("    Entry #{}:", j);
-                        println!("        Flags: 0x{:02X}", entry.flags);
-                        if entry.magic != *b"\xCD\x3F" {
-                            println!(
-                                "        <Invalid magic>: {:02X} {:02X}",
-                                entry.magic[0], entry.magic[1]
-                            );
-                        }
-                        println!("        Segment: 0x{:02X}", entry.segment);
-                        println!("        Offset: 0x{:04X}", entry.offset);
+                Moveable(entry) => {
+                    println!("Entry #{}: moveable", i + 1);
+                    println!("    Flags: 0x{:02X}", entry.flags);
+                    if entry.magic != *b"\xCD\x3F" {
+                        println!(
+                            "    <Invalid magic>: {:02X} {:02X}",
+                            entry.magic[0], entry.magic[1]
+                        );
                     }
+                    println!("    Segment: 0x{:02X}", entry.segment);
+                    println!("    Offset: 0x{:04X}", entry.offset);
                 }
             }
         }
