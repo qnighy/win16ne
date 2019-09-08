@@ -90,8 +90,7 @@ impl FixedSegmentEntry {
 #[derive(Debug, Clone, Copy)]
 pub struct MoveableSegmentEntry {
     pub flags: u8,
-    pub unknown: u8,
-    pub magic: u8,
+    pub magic: [u8; 2],
     pub segment: u8,
     pub offset: u16,
 }
@@ -102,8 +101,7 @@ impl MoveableSegmentEntry {
         r.read_exact(&mut buf)?;
         Ok(Self {
             flags: buf[0],
-            unknown: buf[1],
-            magic: buf[2],
+            magic: [buf[1], buf[2]],
             segment: buf[3],
             offset: u16::from_le_bytes(buf[4..6].try_into().unwrap()),
         })

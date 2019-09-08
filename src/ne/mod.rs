@@ -222,9 +222,11 @@ impl NeExecutable {
                     for (j, entry) in bundle.entries.iter().enumerate() {
                         println!("    Entry #{}:", j);
                         println!("        Flags: 0x{:02X}", entry.flags);
-                        println!("        <Unknown field>: 0x{:02X}", entry.unknown);
-                        if entry.magic != 0x3F {
-                            println!("        <Invalid magic>: 0x{:02X}", entry.magic);
+                        if entry.magic != *b"\xCD\x3F" {
+                            println!(
+                                "        <Invalid magic>: {:02X} {:02X}",
+                                entry.magic[0], entry.magic[1]
+                            );
                         }
                         println!("        Segment: 0x{:02X}", entry.segment);
                         println!("        Offset: 0x{:04X}", entry.offset);
