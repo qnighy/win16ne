@@ -195,6 +195,11 @@ impl Inst {
             modrm: self.modrm.unwrap_or(0),
         }
     }
+
+    fn reg_name(&self, wide: bool) -> &'static str {
+        let (_, reg, _) = split233(self.modrm.unwrap_or(0));
+        regname(reg, self.is_32d(), wide)
+    }
 }
 
 impl fmt::Display for Inst {
@@ -206,10 +211,15 @@ impl fmt::Display for Inst {
             opcode if (0..0x40).contains(&opcode) && opcode & 7 < 6 => {
                 let opname =
                     ["add", "or", "adc", "sbb", "and", "sub", "xor", "cmp"][(opcode >> 3) as usize];
-                if opcode & 6 == 0 {
-                    write!(f, "{} {}, [reg]", opname, self.rm_name(opcode & 1 != 0))
-                } else if opcode & 6 == 2 {
-                    write!(f, "{} [reg], {}", opname, self.rm_name(opcode & 1 != 0))
+                if opcode & 4 == 0 {
+                    let wide = opcode & 1 != 0;
+                    let reg = self.reg_name(wide);
+                    let rm = self.rm_name(wide);
+                    if opcode & 2 == 0 {
+                        write!(f, "{} {}, %{}", opname, rm, reg)
+                    } else {
+                        write!(f, "{} %{}, {}", opname, reg, rm)
+                    }
                 } else {
                     write!(f, "{} ...", opname)
                 }
