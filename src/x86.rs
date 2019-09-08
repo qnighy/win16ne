@@ -323,6 +323,16 @@ impl fmt::Display for Inst {
                 }
             }
             0x55 => write!(f, "nop"),
+            opcode if (0x88..0x8C).contains(&opcode) => {
+                let wide = opcode & 1 != 0;
+                let reg = self.reg_name(wide);
+                let rm = self.rm_name(wide);
+                if opcode & 2 == 0 {
+                    write!(f, "mov %{}, {}", reg, rm)
+                } else {
+                    write!(f, "mov {}, %{}", rm, reg)
+                }
+            }
             _ => write!(f, "..."),
         }
     }
@@ -411,7 +421,7 @@ impl fmt::Display for RmDisp {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let (mod_, _, rm) = split233(self.modrm);
         if mod_ == 3 {
-            write!(f, "{}", regname(rm, self.is_32d, self.wide))
+            write!(f, "%{}", regname(rm, self.is_32d, self.wide))
         } else if self.is_32a {
             write!(f, "...")
         } else {
