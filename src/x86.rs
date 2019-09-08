@@ -166,7 +166,7 @@ fn eat(code: &[u8], is_32c: bool) -> Result<Inst, EatError> {
         0b00010000_00010000_00010000_00010000,
         0b00000000_00000000_00000000_00000000,
         0b11111111_11111111_00000101_00000000,
-        0b00000000_00000000_00000000_00000001,
+        0b00000000_00000000_00000000_00001001,
         0b00000000_11111111_00000001_00000000,
         0b00000000_00000000_00100001_01000001,
         0b00000000_00000000_00001000_11111111,
@@ -176,7 +176,7 @@ fn eat(code: &[u8], is_32c: bool) -> Result<Inst, EatError> {
         0b00100000_00100000_00100000_00100000,
         0b00000000_00000000_00000000_00000000,
         0b00000000_00000000_00001010_00000000,
-        0b00000000_00000000_00000000_00001010,
+        0b00000000_00000000_00000000_00000010,
         0b11111111_00000000_00000010_00000000,
         0b00000000_00000000_00000000_10000010,
         0b00000000_00000000_00000011_00000000,
@@ -323,6 +323,14 @@ impl fmt::Display for Inst {
                 }
             }
             0x55 => write!(f, "nop"),
+            0x80 | 0x81 | 0x83 => {
+                let (_, subop, _) = split233(self.modrm.unwrap_or(0));
+                let opname =
+                    ["add", "or", "adc", "sbb", "and", "sub", "xor", "cmp"][subop as usize];
+                let imm = SignedImmDisp(self.immediate);
+                let rm = self.rm_name(self.opcode != 0x80);
+                write!(f, "{} {}, {}", opname, imm, rm)
+            }
             opcode if (0x88..0x8C).contains(&opcode) => {
                 let wide = opcode & 1 != 0;
                 let reg = self.reg_name(wide);
@@ -453,6 +461,21 @@ fn regname(id: u8, is_32d: bool, wide: bool) -> &'static str {
         ["ax", "cx", "dx", "bx", "sp", "bp", "si", "di"][id as usize]
     } else {
         ["eax", "ecx", "edx", "ebx", "esp", "ebp", "esi", "edi"][id as usize]
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+struct SignedImmDisp(Immediate);
+
+impl fmt::Display for SignedImmDisp {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        use self::Immediate::*;
+        match self.0 {
+            None => Ok(()),
+            Byte(x) => write!(f, "${:#x}", x as i8),
+            Word(x) => write!(f, "${:#x}", x as i16),
+            DWord(x) => write!(f, "${:#x}", x as i32),
+        }
     }
 }
 
