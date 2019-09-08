@@ -97,7 +97,7 @@ impl NeExecutable {
         })
     }
 
-    pub(crate) fn describe(&self, show_data: bool) {
+    pub(crate) fn describe(&self, show_data: bool, disassemble: bool) {
         let Self {
             ne_header,
             segment_entries,
@@ -261,11 +261,17 @@ impl NeExecutable {
             }
         }
 
-        if !show_data {
-            return;
+        for (_i, segment) in segment_entries.iter().enumerate() {
+            if !disassemble || (segment.header.flags & 7) != 0 {
+                continue;
+            }
+            crate::x86::disassemble(&segment.data);
         }
 
         for (i, segment) in segment_entries.iter().enumerate() {
+            if !show_data {
+                continue;
+            }
             println!("Segment #{} data:", i);
             for (i, chunk) in segment.data.chunks(16).enumerate() {
                 print!("{:08X} ", i * 16);

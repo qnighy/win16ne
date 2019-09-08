@@ -5,12 +5,16 @@ use structopt::StructOpt;
 
 pub mod mz;
 pub mod ne;
+pub mod x86;
 
 use ne::NeExecutable;
 
 #[derive(Debug, Clone, StructOpt)]
 pub struct Opts {
     #[structopt(short, long)]
+    disassemble: bool,
+
+    #[structopt(long)]
     data: bool,
 
     #[structopt(name = "FILE", parse(from_os_str))]
@@ -38,7 +42,7 @@ fn main() -> io::Result<()> {
         let mut cursor = Cursor::new(data.as_slice());
 
         let parsed = NeExecutable::read(&mut cursor)?;
-        parsed.describe(opts.data);
+        parsed.describe(opts.data, opts.disassemble);
     }
     Ok(())
 }
