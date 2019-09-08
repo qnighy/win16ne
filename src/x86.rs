@@ -216,9 +216,9 @@ impl fmt::Display for Inst {
                     let reg = self.reg_name(wide);
                     let rm = self.rm_name(wide);
                     if opcode & 2 == 0 {
-                        write!(f, "{} {}, %{}", opname, rm, reg)
-                    } else {
                         write!(f, "{} %{}, {}", opname, reg, rm)
+                    } else {
+                        write!(f, "{} {}, %{}", opname, rm, reg)
                     }
                 } else {
                     write!(f, "{} ...", opname)
