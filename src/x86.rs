@@ -104,6 +104,7 @@ fn eat(code: &[u8], is_32c: bool) -> Result<Inst, EatError> {
     let modrm = if has_modrm { Some(eater.next()?) } else { None };
 
     let is_32a = is_32c ^ addr_prefix.is_some();
+    let is_32d = is_32c ^ size_prefix.is_some();
 
     let has_sib = if let Some(modrm) = modrm {
         is_32a && (modrm & 56) == 32 && (modrm & 192) != 192
@@ -150,6 +151,65 @@ fn eat(code: &[u8], is_32c: bool) -> Result<Inst, EatError> {
         ])),
     };
 
+    const IMMEDIATE_MAP: [u32; 8] = [
+        0b00110000_00110000_00110000_00110000,
+        0b00110000_00110000_00110000_00110000,
+        0b00000000_00000000_00000000_00000000,
+        0b11111111_11111111_00001111_00000000,
+        0b00000000_00000000_00000000_00001011,
+        0b11111111_11111111_00000011_00000000,
+        0b00000000_00000000_00100101_11000111,
+        0b00000000_11000000_00001111_11111111,
+    ];
+    const IMMEDIATE_BYTE_MAP: [u32; 8] = [
+        0b00010000_00010000_00010000_00010000,
+        0b00010000_00010000_00010000_00010000,
+        0b00000000_00000000_00000000_00000000,
+        0b11111111_11111111_00000101_00000000,
+        0b00000000_00000000_00000000_00000001,
+        0b00000000_11111111_00000001_00000000,
+        0b00000000_00000000_00100001_01000001,
+        0b00000000_00000000_00001000_11111111,
+    ];
+    const IMMEDIATE_WIDE_MAP: [u32; 8] = [
+        0b00100000_00100000_00100000_00100000,
+        0b00100000_00100000_00100000_00100000,
+        0b00000000_00000000_00000000_00000000,
+        0b00000000_00000000_00001010_00000000,
+        0b00000000_00000000_00000000_00001010,
+        0b11111111_00000000_00000010_00000000,
+        0b00000000_00000000_00000000_10000010,
+        0b00000000_00000000_00000011_00000000,
+    ];
+
+    let immediate_size = if !lookup_byte(&IMMEDIATE_MAP, opcode) {
+        ImmediateSize::None
+    } else if lookup_byte(&IMMEDIATE_BYTE_MAP, opcode) {
+        ImmediateSize::Byte
+    } else if lookup_byte(&IMMEDIATE_WIDE_MAP, opcode) {
+        if is_32d {
+            ImmediateSize::DWord
+        } else {
+            ImmediateSize::Word
+        }
+    } else if opcode == 0xC2 || opcode == 0xCA {
+        ImmediateSize::Word
+    } else {
+        // TODO: EA, F6, F7
+        ImmediateSize::None
+    };
+    let imm = match immediate_size {
+        ImmediateSize::None => Immediate::None,
+        ImmediateSize::Byte => Immediate::Byte(eater.next()?),
+        ImmediateSize::Word => Immediate::Word(u16::from_le_bytes([eater.next()?, eater.next()?])),
+        ImmediateSize::DWord => Immediate::DWord(u32::from_le_bytes([
+            eater.next()?,
+            eater.next()?,
+            eater.next()?,
+            eater.next()?,
+        ])),
+    };
+
     Ok(Inst {
         pos: 0,
         is_invalid: false,
@@ -163,7 +223,7 @@ fn eat(code: &[u8], is_32c: bool) -> Result<Inst, EatError> {
         modrm,
         sib,
         displacement: disp,
-        immediate: Immediate::None, // TODO
+        immediate: imm,
     })
 }
 
