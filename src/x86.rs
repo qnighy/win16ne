@@ -112,6 +112,44 @@ fn eat(code: &[u8], is_32c: bool) -> Result<Inst, EatError> {
     };
     let sib = if has_sib { Some(eater.next()?) } else { None };
 
+    let disp_size = if let Some(modrm) = modrm {
+        let (mod_, _, rm) = split233(modrm);
+        if is_32a {
+            if mod_ == 1 {
+                ImmediateSize::Byte
+            } else if mod_ == 2 {
+                ImmediateSize::DWord
+            } else if mod_ == 0 && rm == 5 {
+                ImmediateSize::DWord
+            } else {
+                ImmediateSize::None
+            }
+        } else {
+            if mod_ == 1 {
+                ImmediateSize::Byte
+            } else if mod_ == 2 {
+                ImmediateSize::Word
+            } else if mod_ == 0 && rm == 6 {
+                ImmediateSize::Word
+            } else {
+                ImmediateSize::None
+            }
+        }
+    } else {
+        ImmediateSize::None
+    };
+    let disp = match disp_size {
+        ImmediateSize::None => Immediate::None,
+        ImmediateSize::Byte => Immediate::Byte(eater.next()?),
+        ImmediateSize::Word => Immediate::Word(u16::from_le_bytes([eater.next()?, eater.next()?])),
+        ImmediateSize::DWord => Immediate::DWord(u32::from_le_bytes([
+            eater.next()?,
+            eater.next()?,
+            eater.next()?,
+            eater.next()?,
+        ])),
+    };
+
     Ok(Inst {
         pos: 0,
         is_invalid: false,
@@ -124,8 +162,8 @@ fn eat(code: &[u8], is_32c: bool) -> Result<Inst, EatError> {
         opcode2,
         modrm,
         sib,
-        displacement: Immediate::None, // TODO
-        immediate: Immediate::None,    // TODO
+        displacement: disp,
+        immediate: Immediate::None, // TODO
     })
 }
 
@@ -231,6 +269,14 @@ impl fmt::Display for Inst {
 }
 
 #[derive(Debug, Clone, Copy)]
+pub enum ImmediateSize {
+    None,
+    Byte,
+    Word,
+    DWord,
+}
+
+#[derive(Debug, Clone, Copy)]
 pub enum Immediate {
     None,
     Byte(u8),
@@ -310,11 +356,11 @@ impl fmt::Display for RmDisp {
             write!(f, "...")
         } else {
             if mod_ == 0 && rm == 6 {
-                write!(f, "[disp]")
+                write!(f, "{}", DispDisp(self.disp))
             } else if mod_ == 0 {
                 write!(f, "{}", RM16_TABLE[rm as usize])
             } else {
-                write!(f, "[disp]{}", RM16_TABLE[rm as usize])
+                write!(f, "{}{}", DispDisp(self.disp), RM16_TABLE[rm as usize])
             }
         }
     }
@@ -337,6 +383,21 @@ fn regname(id: u8, is_32d: bool, wide: bool) -> &'static str {
         ["ax", "cx", "dx", "bx", "sp", "bp", "si", "di"][id as usize]
     } else {
         ["eax", "ecx", "edx", "ebx", "esp", "ebp", "esi", "edi"][id as usize]
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+struct DispDisp(Immediate);
+
+impl fmt::Display for DispDisp {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        use self::Immediate::*;
+        match self.0 {
+            None => Ok(()),
+            Byte(x) => write!(f, "{:#x}", x as i8),
+            Word(x) => write!(f, "{:#x}", x as i16),
+            DWord(x) => write!(f, "{:#x}", x as i32),
+        }
     }
 }
 
