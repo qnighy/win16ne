@@ -265,7 +265,7 @@ impl NeExecutable {
             if !disassemble || (segment.header.flags & 7) != 0 {
                 continue;
             }
-            crate::x86::disassemble(&segment.data);
+            crate::x86::disassemble(&segment.data, false);
         }
 
         for (i, segment) in segment_entries.iter().enumerate() {
