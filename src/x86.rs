@@ -323,6 +323,13 @@ impl fmt::Display for Inst {
                 }
             }
             0x55 => write!(f, "nop"),
+            opcode if (0x70..0x80).contains(&opcode) => {
+                let cc = [
+                    "o", "no", "b", "nb", "z", "nz", "be", "nbe", "s", "ns", "p", "np", "l", "nl",
+                    "le", "nle",
+                ][opcode as usize & 0xF];
+                write!(f, "j{} ...", cc)
+            }
             0x80 | 0x81 | 0x83 => {
                 let (_, subop, _) = split233(self.modrm.unwrap_or(0));
                 let opname =
