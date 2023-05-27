@@ -1,7 +1,7 @@
 use std::fs::File;
 use std::io::{self, BufReader, Cursor, Read};
 use std::path::PathBuf;
-use clap::StructOpt;
+use clap::Parser;
 
 pub mod mz;
 pub mod ne;
@@ -9,15 +9,15 @@ pub mod x86;
 
 use ne::NeExecutable;
 
-#[derive(Debug, Clone, StructOpt)]
+#[derive(Debug, Clone, Parser)]
 pub struct Opts {
-    #[structopt(short, long)]
+    #[clap(short, long)]
     disassemble: bool,
 
-    #[structopt(long)]
+    #[clap(long)]
     data: bool,
 
-    #[structopt(name = "FILE", parse(from_os_str))]
+    #[clap(name = "FILE", parse(from_os_str))]
     files: Vec<PathBuf>,
 }
 
