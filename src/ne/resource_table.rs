@@ -17,6 +17,22 @@ impl NeResourceTable {
             resource_types,
         })
     }
+
+    pub fn read_variadic<R: Read>(r: &mut R) -> io::Result<Self> {
+        let header = NeResourceTableHeader::read(r)?;
+        let mut resource_types = Vec::new();
+        loop {
+            if let Some(resource_type) = NeResourceType::read_opt(r)? {
+                resource_types.push(resource_type);
+            } else {
+                break;
+            }
+        }
+        Ok(Self {
+            header,
+            resource_types,
+        })
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -48,6 +64,17 @@ impl NeResourceType {
             .map(|_| NeResource::read(r))
             .collect::<Result<Vec<_>, _>>()?;
         Ok(Self { header, resources })
+    }
+
+    pub fn read_opt<R: Read>(r: &mut R) -> io::Result<Option<Self>> {
+        let header = NeResourceTypeHeader::read(r)?;
+        if header.type_id == 0 {
+            return Ok(None);
+        }
+        let resources = (0..header.num_resources)
+            .map(|_| NeResource::read(r))
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(Some(Self { header, resources }))
     }
 }
 

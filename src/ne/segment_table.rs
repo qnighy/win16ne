@@ -6,7 +6,7 @@ use std::io::{self, Read, Seek, SeekFrom};
 pub struct NeSegment {
     pub header: NeSegmentHeader,
     pub shift_count: u16,
-    pub data: Vec<u8>,
+    pub data: Option<Vec<u8>>,
 }
 
 impl NeSegment {
@@ -14,16 +14,20 @@ impl NeSegment {
         Ok(Self {
             header: NeSegmentHeader::read(r)?,
             shift_count,
-            data: Vec::default(),
+            data: None,
         })
     }
 
     pub fn read_data<R: Read + Seek>(&mut self, r: &mut R) -> io::Result<()> {
+        if self.header.data_offset_shifted == 0 {
+            return Ok(());
+        }
         let data_offset = self.data_offset();
         let data_length = self.data_length();
         r.seek(SeekFrom::Start(data_offset))?;
-        self.data.resize(data_length as usize, 0);
-        r.read_exact(&mut self.data)?;
+        let mut data = vec![0; data_length as usize];
+        r.read_exact(&mut data)?;
+        self.data = Some(data);
         Ok(())
     }
 

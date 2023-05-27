@@ -56,7 +56,11 @@ impl NeExecutable {
 
         let rt_offset = lfanew + ne_header.resource_table_offset.value() as u64;
         file.seek(SeekFrom::Start(rt_offset))?;
-        let resource_table = NeResourceTable::read(file, ne_header.resource_table_entries.value())?;
+        let resource_table = if ne_header.resource_table_entries.value() == 0xFFFF {
+            NeResourceTable::read_variadic(file)?
+        } else {
+            NeResourceTable::read(file, ne_header.resource_table_entries.value())?
+        };
         debug!("resource_table = {:#?}", resource_table);
 
         let rnt_offset = lfanew + ne_header.resident_names_table_offset.value() as u64;
@@ -276,39 +280,43 @@ impl NeExecutable {
             if !disassemble || (segment.header.flags & 7) != 0 {
                 continue;
             }
-            crate::x86::disassemble(&segment.data, false);
+            if let Some(data) = &segment.data {
+                crate::x86::disassemble(data, false);
+            }
         }
 
         for (i, segment) in segment_entries.iter().enumerate() {
             if !show_data {
                 continue;
             }
-            println!("Segment #{} data:", i);
-            for (i, chunk) in segment.data.chunks(16).enumerate() {
-                print!("{:08X} ", i * 16);
-                for j in 0..16 {
-                    if let Some(x) = chunk.get(j) {
-                        print!(" {:02X}", x);
-                    } else {
-                        print!("   ");
+            if let Some(data) = &segment.data {
+                println!("Segment #{} data:", i);
+                for (i, chunk) in data.chunks(16).enumerate() {
+                    print!("{:08X} ", i * 16);
+                    for j in 0..16 {
+                        if let Some(x) = chunk.get(j) {
+                            print!(" {:02X}", x);
+                        } else {
+                            print!("   ");
+                        }
+                        if j == 7 {
+                            print!(" ");
+                        }
                     }
-                    if j == 7 {
-                        print!(" ");
+                    print!("  |");
+                    for &byte in chunk {
+                        if 0x20 <= byte && byte < 0x7F {
+                            print!("{}", byte as char);
+                        } else {
+                            print!(".");
+                        }
                     }
+                    print!("|");
+                    println!();
                 }
-                print!("  |");
-                for &byte in chunk {
-                    if 0x20 <= byte && byte < 0x7F {
-                        print!("{}", byte as char);
-                    } else {
-                        print!(".");
-                    }
-                }
-                print!("|");
+                println!("{:08X}", (data.len() + 15) / 16 * 16);
                 println!();
             }
-            println!("{:08X}", (segment.data.len() + 15) / 16 * 16);
-            println!();
         }
     }
 }
