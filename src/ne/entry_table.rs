@@ -10,10 +10,24 @@ impl EntryTable {
     pub fn read<R: Read>(r: &mut R, mut length: u16) -> io::Result<Self> {
         let mut entries = Vec::new();
         while length > 0 {
-            let [num, segment] = {
-                let mut buf = [0; 2];
+            let num = {
+                let mut buf = [0];
                 r.read_exact(&mut buf)?;
-                buf
+                buf[0]
+            };
+            if num == 0 {
+                if length != 1 {
+                    return Err(io::Error::new(
+                        io::ErrorKind::InvalidData,
+                        "Inexact length for entry table",
+                    ));
+                }
+                break;
+            }
+            let segment = {
+                let mut buf = [0];
+                r.read_exact(&mut buf)?;
+                buf[0]
             };
             let bundle_size = if segment == 0 {
                 0
