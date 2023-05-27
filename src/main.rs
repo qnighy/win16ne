@@ -1,12 +1,13 @@
 use std::fs::File;
 use std::io::{self, BufReader, Cursor, Read};
 use std::path::PathBuf;
+
 use clap::Parser;
 
 pub mod mz;
 pub mod ne;
-pub mod x86;
 pub mod util;
+pub mod x86;
 
 use ne::NeExecutable;
 

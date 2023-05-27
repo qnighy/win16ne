@@ -1,12 +1,14 @@
-use std::fmt;
 use bytemuck::TransparentWrapper;
+use std::fmt;
 
 macro_rules! define_int {
     ($LT:ident, $BT:ident, $V:ident) => {
-        #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default, TransparentWrapper)]
+        #[derive(
+            Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default, TransparentWrapper,
+        )]
         #[repr(transparent)]
         pub struct $LT {
-            le_value: $V
+            le_value: $V,
         }
 
         impl $LT {
@@ -39,10 +41,12 @@ macro_rules! define_int {
             }
         }
 
-        #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default, TransparentWrapper)]
+        #[derive(
+            Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default, TransparentWrapper,
+        )]
         #[repr(transparent)]
         pub struct $BT {
-            be_value: $V
+            be_value: $V,
         }
 
         impl $BT {
