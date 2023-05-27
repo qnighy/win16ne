@@ -6,6 +6,7 @@ use clap::Parser;
 pub mod mz;
 pub mod ne;
 pub mod x86;
+pub mod util;
 
 use ne::NeExecutable;
 
