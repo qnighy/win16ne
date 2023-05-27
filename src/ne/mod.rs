@@ -46,39 +46,39 @@ impl NeExecutable {
         ne_header.check_magic()?;
 
         file.seek(SeekFrom::Start(
-            lfanew + ne_header.segment_table_offset as u64,
+            lfanew + ne_header.segment_table_offset.value() as u64,
         ))?;
 
-        let mut segment_entries = (0..ne_header.segment_count)
-            .map(|_| NeSegment::read(file, ne_header.file_alignment_shift_count))
+        let mut segment_entries = (0..ne_header.segment_count.value())
+            .map(|_| NeSegment::read(file, ne_header.file_alignment_shift_count.value()))
             .collect::<Result<Vec<_>, _>>()?;
         debug!("segment_entries = {:#?}", segment_entries);
 
-        let rt_offset = lfanew + ne_header.resource_table_offset as u64;
+        let rt_offset = lfanew + ne_header.resource_table_offset.value() as u64;
         file.seek(SeekFrom::Start(rt_offset))?;
-        let resource_table = NeResourceTable::read(file, ne_header.resource_table_entries)?;
+        let resource_table = NeResourceTable::read(file, ne_header.resource_table_entries.value())?;
         debug!("resource_table = {:#?}", resource_table);
 
-        let rnt_offset = lfanew + ne_header.resident_names_table_offset as u64;
+        let rnt_offset = lfanew + ne_header.resident_names_table_offset.value() as u64;
         file.seek(SeekFrom::Start(rnt_offset))?;
         let resident_name_table = ResidentNameTable::read(file)?;
         debug!("resident_name_table = {:#?}", resident_name_table);
 
-        let mrt_offset = lfanew + ne_header.module_reference_table_offset as u64;
+        let mrt_offset = lfanew + ne_header.module_reference_table_offset.value() as u64;
         file.seek(SeekFrom::Start(mrt_offset))?;
         let mut module_reference_table =
-            ModuleReferenceTable::read(file, ne_header.module_references)?;
+            ModuleReferenceTable::read(file, ne_header.module_references.value())?;
         debug!("module_reference_table = {:#?}", module_reference_table);
 
-        let int_offset = lfanew + ne_header.import_name_table_offset as u64;
+        let int_offset = lfanew + ne_header.import_name_table_offset.value() as u64;
         module_reference_table.read_names(file, int_offset)?;
 
-        let et_offset = lfanew + ne_header.entry_table_offset as u64;
+        let et_offset = lfanew + ne_header.entry_table_offset.value() as u64;
         file.seek(SeekFrom::Start(et_offset))?;
-        let entry_table = EntryTable::read(file, ne_header.entry_table_length)?;
+        let entry_table = EntryTable::read(file, ne_header.entry_table_length.value())?;
         debug!("entry_table = {:#?}", entry_table);
 
-        let nnt_offset = ne_header.non_resident_names_table_offset as u64;
+        let nnt_offset = ne_header.non_resident_names_table_offset.value() as u64;
         file.seek(SeekFrom::Start(nnt_offset))?;
         let nonresident_name_table = NonresidentNameTable::read(file)?;
         debug!("nonresident_name_table = {:#?}", nonresident_name_table);
@@ -117,7 +117,7 @@ impl NeExecutable {
             let mut flag_found = false;
             for shift in 0..16 {
                 let mask = 1 << shift;
-                if (mask & ne_header.flags) == 0 {
+                if (mask & ne_header.flags.value()) == 0 {
                     continue;
                 }
                 if flag_found {
@@ -143,36 +143,45 @@ impl NeExecutable {
         println!();
         println!(
             "    Auto-data segment: {}",
-            ne_header.auto_data_segment_index
+            ne_header.auto_data_segment_index.value()
         );
-        println!("    Initial heap size: {}", ne_header.init_heap_size);
-        println!("    Initial stack size: {}", ne_header.init_stack_size);
+        println!(
+            "    Initial heap size: {}",
+            ne_header.init_heap_size.value()
+        );
+        println!(
+            "    Initial stack size: {}",
+            ne_header.init_stack_size.value()
+        );
         println!(
             "    Entry point (CS:IP): {:04X}:{:04X}",
-            ne_header.entry_point >> 16,
-            ne_header.entry_point & 0xFFFF
+            ne_header.entry_point.value() >> 16,
+            ne_header.entry_point.value() & 0xFFFF
         );
         println!(
             "    Initial stack (SS:SP): {:04X}:{:04X}",
-            ne_header.init_stack >> 16,
-            ne_header.init_stack & 0xFFFF
+            ne_header.init_stack.value() >> 16,
+            ne_header.init_stack.value() & 0xFFFF
         );
-        println!("    Number of segments: {}", ne_header.segment_count);
+        println!(
+            "    Number of segments: {}",
+            ne_header.segment_count.value()
+        );
         println!(
             "    Number of referenced modules: {}",
-            ne_header.module_references
+            ne_header.module_references.value()
         );
         println!(
             "    Number of movable entry points: {}",
-            ne_header.movable_entry_point_count
+            ne_header.movable_entry_point_count.value()
         );
         println!(
             "    Number of file alignment shifts: {}",
-            ne_header.file_alignment_shift_count
+            ne_header.file_alignment_shift_count.value()
         );
         println!(
             "    Number of resource table entries: {}",
-            ne_header.resource_table_entries
+            ne_header.resource_table_entries.value()
         );
         print!("    Target os: ");
         if ne_header.target_os == 2 {
