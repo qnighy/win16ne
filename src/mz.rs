@@ -1,93 +1,63 @@
-use std::convert::TryInto;
 use std::io::{self, Read};
 
+use bytemuck::{Pod, Zeroable};
+
+use crate::util::endian::{Lu16, Lu32};
+
 /// The DOS header.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Pod, Zeroable)]
+#[repr(C)]
 pub struct DosHeader {
     /// MZ Header signature
-    pub magic: u16,
+    pub magic: Lu16,
     /// Bytes on last page of file
-    pub cblp: u16,
+    pub cblp: Lu16,
     /// Pages in file
-    pub cp: u16,
+    pub cp: Lu16,
     /// Relocations
-    pub crlc: u16,
+    pub crlc: Lu16,
     /// Size of header in paragraphs
-    pub cparhdr: u16,
+    pub cparhdr: Lu16,
     /// Minimum extra paragraphs needed
-    pub minalloc: u16,
+    pub minalloc: Lu16,
     /// Maximum extra paragraphs needed
-    pub maxalloc: u16,
+    pub maxalloc: Lu16,
     /// Initial (relative) SS value
-    pub ss: u16,
+    pub ss: Lu16,
     /// Initial SP value
-    pub sp: u16,
+    pub sp: Lu16,
     /// Checksum
-    pub csum: u16,
+    pub csum: Lu16,
     /// Initial IP value
-    pub ip: u16,
+    pub ip: Lu16,
     /// Initial (relative) CS value
-    pub cs: u16,
+    pub cs: Lu16,
     /// File address of relocation table
-    pub lfarlc: u16,
+    pub lfarlc: Lu16,
     /// Overlay number
-    pub ovno: u16,
+    pub ovno: Lu16,
     /// Reserved words
-    pub res: [u16; 4],
+    pub res: [Lu16; 4],
     /// OEM identifier (for e_oeminfo)
-    pub oemid: u16,
+    pub oemid: Lu16,
     /// OEM information; e_oemid specific
-    pub oeminfo: u16,
+    pub oeminfo: Lu16,
     /// Reserved words
-    pub res2: [u16; 10],
+    pub res2: [Lu16; 10],
     /// Offset to extended header
-    pub lfanew: u32,
+    pub lfanew: Lu32,
 }
 
 impl DosHeader {
     pub fn read<R: Read>(r: &mut R) -> io::Result<Self> {
         let mut buf = [0; 0x40];
         r.read_exact(&mut buf)?;
-        let get_u16 = |pos| u16::from_le_bytes(buf[pos..pos + 2].try_into().unwrap());
-        let get_u32 = |pos| u32::from_le_bytes(buf[pos..pos + 4].try_into().unwrap());
-
-        Ok(Self {
-            magic: get_u16(0),
-            cblp: get_u16(2),
-            cp: get_u16(4),
-            crlc: get_u16(6),
-            cparhdr: get_u16(8),
-            minalloc: get_u16(0xA),
-            maxalloc: get_u16(0xC),
-            ss: get_u16(0xE),
-            sp: get_u16(0x10),
-            csum: get_u16(0x12),
-            ip: get_u16(0x14),
-            cs: get_u16(0x16),
-            lfarlc: get_u16(0x18),
-            ovno: get_u16(0x1A),
-            res: [get_u16(0x1C), get_u16(0x1E), get_u16(0x20), get_u16(0x22)],
-            oemid: get_u16(0x24),
-            oeminfo: get_u16(0x26),
-            res2: [
-                get_u16(0x28),
-                get_u16(0x2A),
-                get_u16(0x2C),
-                get_u16(0x2E),
-                get_u16(0x30),
-                get_u16(0x32),
-                get_u16(0x34),
-                get_u16(0x36),
-                get_u16(0x38),
-                get_u16(0x3A),
-            ],
-            lfanew: get_u32(0x3C),
-        })
+        Ok(bytemuck::cast(buf))
     }
 
     pub fn check_magic(&self) -> io::Result<()> {
         // 4D 5A == b"MZ"
-        if self.magic != 0x5A4D {
+        if self.magic.value() != 0x5A4D {
             return Err(io::Error::new(io::ErrorKind::InvalidInput, "invalid magic"));
         }
         Ok(())
@@ -163,25 +133,41 @@ mod tests {
     impl From<DosHeader> for DosHeader2 {
         fn from(h: DosHeader) -> Self {
             DosHeader2 {
-                magic: h.magic,
-                cblp: h.cblp,
-                cp: h.cp,
-                crlc: h.crlc,
-                cparhdr: h.cparhdr,
-                minalloc: h.minalloc,
-                maxalloc: h.maxalloc,
-                ss: h.ss,
-                sp: h.sp,
-                csum: h.csum,
-                ip: h.ip,
-                cs: h.cs,
-                lfarlc: h.lfarlc,
-                ovno: h.ovno,
-                res: h.res,
-                oemid: h.oemid,
-                oeminfo: h.oeminfo,
-                res2: h.res2,
-                lfanew: h.lfanew,
+                magic: h.magic.value(),
+                cblp: h.cblp.value(),
+                cp: h.cp.value(),
+                crlc: h.crlc.value(),
+                cparhdr: h.cparhdr.value(),
+                minalloc: h.minalloc.value(),
+                maxalloc: h.maxalloc.value(),
+                ss: h.ss.value(),
+                sp: h.sp.value(),
+                csum: h.csum.value(),
+                ip: h.ip.value(),
+                cs: h.cs.value(),
+                lfarlc: h.lfarlc.value(),
+                ovno: h.ovno.value(),
+                res: [
+                    h.res[0].value(),
+                    h.res[1].value(),
+                    h.res[2].value(),
+                    h.res[3].value(),
+                ],
+                oemid: h.oemid.value(),
+                oeminfo: h.oeminfo.value(),
+                res2: [
+                    h.res2[0].value(),
+                    h.res2[1].value(),
+                    h.res2[2].value(),
+                    h.res2[3].value(),
+                    h.res2[4].value(),
+                    h.res2[5].value(),
+                    h.res2[6].value(),
+                    h.res2[7].value(),
+                    h.res2[8].value(),
+                    h.res2[9].value(),
+                ],
+                lfanew: h.lfanew.value(),
             }
         }
     }

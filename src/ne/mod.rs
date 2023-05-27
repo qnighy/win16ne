@@ -37,14 +37,16 @@ impl NeExecutable {
         debug!("dos_header = {:?}", dos_header);
         dos_header.check_magic()?;
 
-        file.seek(SeekFrom::Start(dos_header.lfanew as u64))?;
+        let lfanew = dos_header.lfanew.value() as u64;
+
+        file.seek(SeekFrom::Start(lfanew))?;
 
         let ne_header = NeHeader::read(file)?;
         debug!("ne_header = {:#?}", ne_header);
         ne_header.check_magic()?;
 
         file.seek(SeekFrom::Start(
-            dos_header.lfanew as u64 + ne_header.segment_table_offset as u64,
+            lfanew + ne_header.segment_table_offset as u64,
         ))?;
 
         let mut segment_entries = (0..ne_header.segment_count)
@@ -52,26 +54,26 @@ impl NeExecutable {
             .collect::<Result<Vec<_>, _>>()?;
         debug!("segment_entries = {:#?}", segment_entries);
 
-        let rt_offset = dos_header.lfanew as u64 + ne_header.resource_table_offset as u64;
+        let rt_offset = lfanew + ne_header.resource_table_offset as u64;
         file.seek(SeekFrom::Start(rt_offset))?;
         let resource_table = NeResourceTable::read(file, ne_header.resource_table_entries)?;
         debug!("resource_table = {:#?}", resource_table);
 
-        let rnt_offset = dos_header.lfanew as u64 + ne_header.resident_names_table_offset as u64;
+        let rnt_offset = lfanew + ne_header.resident_names_table_offset as u64;
         file.seek(SeekFrom::Start(rnt_offset))?;
         let resident_name_table = ResidentNameTable::read(file)?;
         debug!("resident_name_table = {:#?}", resident_name_table);
 
-        let mrt_offset = dos_header.lfanew as u64 + ne_header.module_reference_table_offset as u64;
+        let mrt_offset = lfanew + ne_header.module_reference_table_offset as u64;
         file.seek(SeekFrom::Start(mrt_offset))?;
         let mut module_reference_table =
             ModuleReferenceTable::read(file, ne_header.module_references)?;
         debug!("module_reference_table = {:#?}", module_reference_table);
 
-        let int_offset = dos_header.lfanew as u64 + ne_header.import_name_table_offset as u64;
+        let int_offset = lfanew + ne_header.import_name_table_offset as u64;
         module_reference_table.read_names(file, int_offset)?;
 
-        let et_offset = dos_header.lfanew as u64 + ne_header.entry_table_offset as u64;
+        let et_offset = lfanew + ne_header.entry_table_offset as u64;
         file.seek(SeekFrom::Start(et_offset))?;
         let entry_table = EntryTable::read(file, ne_header.entry_table_length)?;
         debug!("entry_table = {:#?}", entry_table);
