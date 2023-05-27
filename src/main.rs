@@ -1,7 +1,7 @@
 use std::fs::File;
 use std::io::{self, BufReader, Cursor, Read};
 use std::path::PathBuf;
-use structopt::StructOpt;
+use clap::StructOpt;
 
 pub mod mz;
 pub mod ne;
