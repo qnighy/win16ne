@@ -17,14 +17,14 @@ pub struct Opts {
     #[clap(long)]
     data: bool,
 
-    #[clap(name = "FILE", parse(from_os_str))]
+    #[clap(name = "FILE", value_parser)]
     files: Vec<PathBuf>,
 }
 
 fn main() -> io::Result<()> {
     env_logger::init();
 
-    let opts = Opts::from_args();
+    let opts = Opts::parse();
 
     if opts.files.is_empty() {
         eprintln!("Error: no files specified");
