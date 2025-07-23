@@ -10,7 +10,7 @@ pub fn disassemble(code: &[u8], is_32: bool) {
         insts.push(inst);
     }
 
-    println!("0000:0000 <.text>:");
+    println!("0000:0000 <CODE>:"); // <-- Borland C/++ notation.
     for inst in &insts {
         let pos = inst.pos;
         let len = inst.len();
@@ -30,7 +30,7 @@ pub fn disassemble(code: &[u8], is_32: bool) {
     }
 }
 
-fn eat(code: &[u8], is_32c: bool) -> Result<Inst, EatError> {
+fn eat(code: &[u8], is_32c: bool) -> Result<Instruction, EatError> {
     let mut eater = SimpleEater::new(code);
     let inst_prefix = eater.next_if(|b| b == 0xF0 || b == 0xF2 || b == 0xF3);
     let addr_prefix = eater.next_if(|b| b == 0x67);
@@ -210,7 +210,7 @@ fn eat(code: &[u8], is_32c: bool) -> Result<Inst, EatError> {
         ])),
     };
 
-    Ok(Inst {
+    Ok(Instruction {
         pos: 0,
         is_invalid: false,
         is_32c,
@@ -227,8 +227,8 @@ fn eat(code: &[u8], is_32c: bool) -> Result<Inst, EatError> {
     })
 }
 
-fn gen_invalid(byte: u8) -> Inst {
-    Inst {
+fn gen_invalid(byte: u8) -> Instruction {
+    Instruction {
         pos: 0,
         is_invalid: true,
         is_32c: false,
@@ -246,7 +246,7 @@ fn gen_invalid(byte: u8) -> Inst {
 }
 
 #[derive(Debug, Clone, Copy)]
-pub struct Inst {
+pub struct Instruction {
     pub pos: usize,
     pub is_invalid: bool,
     pub is_32c: bool,
@@ -262,7 +262,7 @@ pub struct Inst {
     pub immediate: Immediate,
 }
 
-impl Inst {
+impl Instruction {
     fn len(&self) -> usize {
         self.inst_prefix.is_some() as usize
             + self.addr_prefix.is_some() as usize
@@ -300,7 +300,7 @@ impl Inst {
     }
 }
 
-impl fmt::Display for Inst {
+impl fmt::Display for Instruction {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         if self.is_invalid {
             return write!(f, "<invalid>");
@@ -414,13 +414,13 @@ impl<'a> SimpleEater<'a> {
             Err(EatError)
         }
     }
-    fn peek(&self) -> Option<u8> {
-        if self.pos < self.code.len() {
-            Some(self.code[self.pos])
-        } else {
-            None
-        }
-    }
+    // fn peek(&self) -> Option<u8> {
+    //     if self.pos < self.code.len() {
+    //         Some(self.code[self.pos])
+    //     } else {
+    //         None
+    //     }
+    // }
 }
 
 #[derive(Debug, Clone, Copy)]

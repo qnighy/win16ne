@@ -32,6 +32,9 @@ pub struct NeExecutable {
 }
 
 impl NeExecutable {
+    ///
+    /// Just reads NE image structures
+    /// 
     pub fn read<R: Read + Seek>(file: &mut R) -> io::Result<Self> {
         let dos_header = DosHeader::read(file)?;
         debug!("dos_header = {:?}", dos_header);
@@ -79,7 +82,9 @@ impl NeExecutable {
 
         let et_offset = lfanew + ne_header.entry_table_offset.value() as u64;
         file.seek(SeekFrom::Start(et_offset))?;
-        let entry_table = EntryTable::read(file, ne_header.entry_table_length.value())?;
+
+        // replaced: read(x) -> read_sf(x)
+        let entry_table = EntryTable::read_sf(file, ne_header.entry_table_offset.value(), ne_header.entry_table_length.value())?;
         debug!("entry_table = {:#?}", entry_table);
 
         let nnt_offset = ne_header.non_resident_names_table_offset.value() as u64;
@@ -102,7 +107,9 @@ impl NeExecutable {
             nonresident_name_table,
         })
     }
-
+    ///
+    /// Writes read information of NE image in terminal.
+    /// 
     pub(crate) fn describe(&self, show_data: bool, disassemble: bool) {
         let Self {
             ne_header,
@@ -113,10 +120,10 @@ impl NeExecutable {
         println!("File Type: Windows New Executable");
         println!("Header:");
         println!(
-            "    Linker version: {}.{}",
+            "\tLinker version: {}.{}",
             ne_header.major_linker_version, ne_header.minor_linker_version
         );
-        print!("    Flags: ");
+        print!("\tFlags: ");
         {
             let mut flag_found = false;
             for shift in 0..16 {
@@ -188,23 +195,34 @@ impl NeExecutable {
             ne_header.resource_table_entries.value()
         );
         print!("    Target os: ");
-        if ne_header.target_os == 2 {
-            print!("Windows");
-        } else {
-            print!("Unknown ({})", ne_header.target_os);
+
+        match ne_header.target_os {
+            0x0 => print!("Not specified"),
+            0x1 => print!("OS/2"),
+            0x2 => print!("Windows/286"),
+            0x3 => print!("DOS 4.x"),
+            0x4 => print!("Windows/386"),
+            0x5 => print!("Borland OSS"),
+            _ => print!("Unknown {:X}", ne_header.target_os)
         }
+
         println!();
-        println!(
-            "    Expected Windows version: {}.{}",
-            ne_header.expected_win_ver[1], ne_header.expected_win_ver[0]
-        );
+        match ne_header.expected_win_ver[1] {
+            0 => (),    
+            _ => {
+                println!(
+                    "\tExpected Windows version: {}.{}",
+                    ne_header.expected_win_ver[1], ne_header.expected_win_ver[0]
+                );
+            }
+        }   
 
         for (i, segment) in segment_entries.iter().enumerate() {
             println!("Segment #{}:", i);
-            println!("    Offset on file: 0x{:04X}", segment.data_offset());
-            println!("    Length on file: 0x{:04X}", segment.data_length());
-            println!("    Flags: 0x{:04X}", segment.header.flags);
-            println!("    Allocation: 0x{:04X}", segment.min_alloc());
+            println!("\tOffset on file: 0x{:04X}", segment.data_offset());
+            println!("\tLength on file: 0x{:04X}", segment.data_length());
+            println!("\tFlags: 0x{:04X}", segment.header.flags);
+            println!("\tAllocation: 0x{:04X}", segment.min_alloc());
         }
 
         if self.resident_name_table.entries.is_empty() {
@@ -227,7 +245,7 @@ impl NeExecutable {
             println!("Resident names:");
             for entry in &self.resident_name_table.entries[1..] {
                 println!(
-                    "    {:3} {}",
+                    "\t{:3} {}",
                     entry.index,
                     String::from_utf8_lossy(&entry.name)
                 );
@@ -237,7 +255,7 @@ impl NeExecutable {
             println!("Nonresident names:");
             for entry in &self.nonresident_name_table.entries[1..] {
                 println!(
-                    "    {:3} {}",
+                    "\t{:3} {}",
                     entry.index,
                     String::from_utf8_lossy(&entry.name)
                 );
@@ -246,7 +264,7 @@ impl NeExecutable {
 
         println!("Module references:");
         for entry in &self.module_reference_table.entries {
-            println!("    {}", String::from_utf8_lossy(&entry.name));
+            println!("\t{}", String::from_utf8_lossy(&entry.name));
         }
 
         for (i, entry) in self.entry_table.entries.iter().enumerate() {
@@ -257,21 +275,21 @@ impl NeExecutable {
                 }
                 Fixed(entry) => {
                     println!("Entry #{}: fixed", i + 1);
-                    println!("    Segment: {}", entry.segment);
-                    println!("    Flags: 0x{:02X}", entry.flags);
-                    println!("    Offset: 0x{:04X}", entry.offset);
+                    println!("\tSegment: {}", entry.segment);
+                    println!("\tFlags: 0x{:02X}", entry.flags);
+                    println!("\tOffset: 0x{:04X}", entry.offset);
                 }
                 Moveable(entry) => {
                     println!("Entry #{}: moveable", i + 1);
-                    println!("    Flags: 0x{:02X}", entry.flags);
-                    if entry.magic != *b"\xCD\x3F" {
+                    println!("\tFlags: 0x{:02X}", entry.flags);
+                    if entry.magic != *b"\xCD\x3F" { // movable entry must have INT 3Fh instruction.
                         println!(
-                            "    <Invalid magic>: {:02X} {:02X}",
+                            "\t<Invalid magic>: {:02X} {:02X}",
                             entry.magic[0], entry.magic[1]
                         );
                     }
-                    println!("    Segment: 0x{:02X}", entry.segment);
-                    println!("    Offset: 0x{:04X}", entry.offset);
+                    println!("\tSegment: 0x{:02X}", entry.segment);
+                    println!("\tOffset: 0x{:04X}", entry.offset);
                 }
             }
         }
