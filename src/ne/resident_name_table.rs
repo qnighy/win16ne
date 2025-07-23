@@ -1,5 +1,22 @@
 use std::io::{self, Read};
 
+///
+/// This table contains a list of ASCII strings. 
+/// 
+/// The first string is the module name given in the module definition file. 
+/// 
+/// The other strings are the names of all exported functions listed in the module definition
+/// file that were not given explicit @ordinal numbers or 
+/// that were explicitly specified in the file as resident names. 
+/// (Exported functions with explicit ordinal numbers in the module definition file
+/// are listed in the nonresident names table.)
+/// 
+/// Each string is prefaced by a single byte indicating the number of
+/// characters in the string and is followed by a word (2 bytes)
+/// referencing an element in the entry table, beginning at 1. The word
+/// that follows the module name is 0. (Offsets are from the beginning of
+/// the record.)
+/// 
 #[derive(Debug, Clone)]
 pub struct ResidentNameTable {
     pub entries: Vec<ResidentNameEntry>,

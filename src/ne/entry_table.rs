@@ -1,7 +1,22 @@
-use std::collections::btree_map::Entry;
 use std::convert::TryInto;
 use std::io::{self, Read};
 
+
+///
+/// This table contains one member for every entry point in the program (EXE/DRV/SYS) or
+/// library module (DLL). 
+/// (Every public FAR function or procedure in a module is
+/// an entry point.) 
+/// 
+/// The members in the entry table have ordinal numbers
+/// beginning at 1. 
+/// These ordinal numbers are referenced by the resident
+/// names table and the nonresident names table.
+/// 
+/// LINK versions 4.0 and later bundle the members of the entry table.
+/// Each bundle begins with the following information. (Offsets are from
+/// the beginning of the bundle.)
+/// 
 #[derive(Debug, Clone)]
 pub struct EntryTable {
     pub entries: Vec<SegmentEntry>,
@@ -73,9 +88,8 @@ impl EntryTable {
     /// 
     /// \param r -- binary reader instance
     /// \param cb_ent_tab -- bundles count in EntryTable /see NE Header/
-    /// \param ent_tab -- EntryTable raw file offset (enttab + e_lfanew)
     /// 
-    pub fn read_sf<R: Read>(r: &mut R, ent_tab: u16, cb_ent_tab: u16) -> io::Result<Self> {
+    pub fn read_sf<R: Read>(r: &mut R, cb_ent_tab: u16) -> io::Result<Self> {
         let mut entries: Vec<SegmentEntry> = Vec::new();
         let mut bytes_remaining = cb_ent_tab;
         let mut ordinal: u16 = 1; // entry index means ordinal in non/resident names tables

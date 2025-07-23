@@ -1,5 +1,16 @@
 use std::convert::TryInto;
 use std::io::{self, Read, Seek, SeekFrom};
+///
+/// This table contains one 8-byte record for every code and data segment
+/// in the program or library module. 
+/// 
+/// Each segment has an #ordinal number
+/// associated with it. For example, the first segment has an ordinal
+/// number of 1. 
+/// These segment numbers are used to reference the segments
+/// in other sections of the New Executable file. 
+/// (Offsets are from the beginning of the record.)
+/// 
 
 /// The New Executable segment table entry.
 #[derive(Debug, Clone)]

@@ -1,4 +1,4 @@
-use log::debug;
+use log::{debug, error};
 use std::io::{self, Read, Seek, SeekFrom};
 
 use self::entry_table::EntryTable;
@@ -9,6 +9,7 @@ use self::resident_name_table::ResidentNameTable;
 use self::resource_table::NeResourceTable;
 use self::segment_table::NeSegment;
 use crate::mz::DosHeader;
+use crate::ne::segment_relocations::RelocationTable;
 
 pub mod entry_table;
 pub mod header;
@@ -17,6 +18,7 @@ pub mod nonresident_name_table;
 pub mod resident_name_table;
 pub mod resource_table;
 pub mod segment_table;
+pub mod segment_relocations;
 
 /// The parsed New Executable binary.
 #[derive(Debug, Clone)]
@@ -29,6 +31,7 @@ pub struct NeExecutable {
     pub module_reference_table: ModuleReferenceTable,
     pub entry_table: EntryTable,
     pub nonresident_name_table: NonresidentNameTable,
+    pub relocation_tables_per_segment: Vec<RelocationTable>
 }
 
 impl NeExecutable {
@@ -38,14 +41,19 @@ impl NeExecutable {
     pub fn read<R: Read + Seek>(file: &mut R) -> io::Result<Self> {
         let dos_header = DosHeader::read(file)?;
         debug!("dos_header = {:?}", dos_header);
-        dos_header.check_magic()?;
+        
+        match dos_header.check_magic() {
+            Ok(_) => (),
+            Err(e) => {
+                return Err(e); // |<-- target application can't be NE segmented image 
+            }
+        };
 
         let lfanew = dos_header.lfanew.value() as u64;
 
         file.seek(SeekFrom::Start(lfanew))?;
 
         let ne_header = NeHeader::read(file)?;
-        debug!("ne_header = {:#?}", ne_header);
         ne_header.check_magic()?;
 
         file.seek(SeekFrom::Start(
@@ -55,28 +63,25 @@ impl NeExecutable {
         let mut segment_entries = (0..ne_header.segment_count.value())
             .map(|_| NeSegment::read(file, ne_header.file_alignment_shift_count.value()))
             .collect::<Result<Vec<_>, _>>()?;
-        debug!("segment_entries = {:#?}", segment_entries);
-
+        
         let rt_offset = lfanew + ne_header.resource_table_offset.value() as u64;
+
         file.seek(SeekFrom::Start(rt_offset))?;
         let resource_table = if ne_header.resource_table_entries.value() == 0xFFFF {
             NeResourceTable::read_variadic(file)?
         } else {
             NeResourceTable::read(file, ne_header.resource_table_entries.value())?
         };
-        debug!("resource_table = {:#?}", resource_table);
-
+        
         let rnt_offset = lfanew + ne_header.resident_names_table_offset.value() as u64;
         file.seek(SeekFrom::Start(rnt_offset))?;
         let resident_name_table = ResidentNameTable::read(file)?;
-        debug!("resident_name_table = {:#?}", resident_name_table);
-
+        
         let mrt_offset = lfanew + ne_header.module_reference_table_offset.value() as u64;
         file.seek(SeekFrom::Start(mrt_offset))?;
         let mut module_reference_table =
             ModuleReferenceTable::read(file, ne_header.module_references.value())?;
-        debug!("module_reference_table = {:#?}", module_reference_table);
-
+        
         let int_offset = lfanew + ne_header.import_name_table_offset.value() as u64;
         module_reference_table.read_names(file, int_offset)?;
 
@@ -84,16 +89,21 @@ impl NeExecutable {
         file.seek(SeekFrom::Start(et_offset))?;
 
         // replaced: read(x) -> read_sf(x)
-        let entry_table = EntryTable::read_sf(file, ne_header.entry_table_offset.value(), ne_header.entry_table_length.value())?;
-        debug!("entry_table = {:#?}", entry_table);
-
+        let entry_table = EntryTable::read_sf(file, ne_header.entry_table_length.value())?;
+        
         let nnt_offset = ne_header.non_resident_names_table_offset.value() as u64;
         file.seek(SeekFrom::Start(nnt_offset))?;
         let nonresident_name_table = NonresidentNameTable::read(file)?;
-        debug!("nonresident_name_table = {:#?}", nonresident_name_table);
+        
 
+        let mut relocs_per_segment = Vec::<RelocationTable>::new();
+        
         for segment in &mut segment_entries {
             segment.read_data(file)?;
+            if segment.header.flags & 0x0008 != 0 {  // must not be SEG_WITHIN_RELOCS
+                let relocations = RelocationTable::read(file)?;
+                relocs_per_segment.push(relocations);
+            }
         }
 
         Ok(Self {
@@ -105,6 +115,7 @@ impl NeExecutable {
             module_reference_table,
             entry_table,
             nonresident_name_table,
+            relocation_tables_per_segment: relocs_per_segment
         })
     }
     ///
@@ -119,8 +130,16 @@ impl NeExecutable {
 
         println!("File Type: Windows New Executable");
         println!("Header:");
+        match ne_header.major_linker_version {
+            0..3 => {
+                error!("Module made by LINK.EXE {}.{}! Some of details are unsupported!", ne_header.major_linker_version, ne_header.minor_linker_version);
+            },
+            _ => {
+                println!("LINK.EXE version supported");
+            }
+        }
         println!(
-            "\tLinker version: {}.{}",
+            "\tLINK.EXE version: {}.{}",
             ne_header.major_linker_version, ne_header.minor_linker_version
         );
         print!("\tFlags: ");
@@ -194,8 +213,8 @@ impl NeExecutable {
             "    Number of resource table entries: {}",
             ne_header.resource_table_entries.value()
         );
+        
         print!("    Target os: ");
-
         match ne_header.target_os {
             0x0 => print!("Not specified"),
             0x1 => print!("OS/2"),
@@ -218,11 +237,30 @@ impl NeExecutable {
         }   
 
         for (i, segment) in segment_entries.iter().enumerate() {
+            // SEGMENTS TABLE info
             println!("Segment #{}:", i);
             println!("\tOffset on file: 0x{:04X}", segment.data_offset());
             println!("\tLength on file: 0x{:04X}", segment.data_length());
             println!("\tFlags: 0x{:04X}", segment.header.flags);
             println!("\tAllocation: 0x{:04X}", segment.min_alloc());
+
+            // SEGMENT RELOCATIONS info
+            if self.relocation_tables_per_segment.len() == 0 {
+                println!("\tSEG_WITHIN_RELOCS");
+                continue;
+            }
+
+            for (reloc_index, reloc) in self.relocation_tables_per_segment[i].entries.iter().enumerate() {
+                // println!("\tRELOC\t{:04X}:{:?}", reloc.segment_offset, reloc.target);
+                println!("\tRelocation #{}", reloc_index);
+                println!("\t\tATP: 0x{:2X}", reloc.address_type);
+                println!("\t\tRTP: 0x{:2X}", reloc.reloc_type);
+                println!("\t\tAdditive? {}", reloc.is_additive);
+                println!("\t\tSegment offset: 0x{:X}", reloc.segment_offset);
+                println!("\t\tTarget address {:?}", reloc.target);
+                
+                println!(); // new line
+            }
         }
 
         if self.resident_name_table.entries.is_empty() {
