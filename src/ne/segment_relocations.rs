@@ -8,19 +8,9 @@ use std::io::{self, Read};
 
 #[derive(Debug, Clone)]
 pub enum RelocationTarget {
-    Internal {
-        segment: u8,
-        is_movable: bool,
-        offset_or_ordinal: u16,
-    },
-    ImportedOrdinal {
-        module_index: u16,
-        ordinal: u16,
-    },
-    ImportedName {
-        module_index: u16,
-        name_offset: u16,
-    },
+    Internal(InternalFixes),
+    ImportByOrdinal(ImportByOrdinal), 
+    ImportByName(ImportByName)
 }
 
 #[derive(Debug, Clone)]
@@ -35,6 +25,22 @@ pub struct RelocationEntry {
 #[derive(Debug, Clone)]
 pub struct RelocationTable {
     pub entries: Vec<RelocationEntry>,
+}
+#[derive(Debug, Clone, Copy)]
+pub struct InternalFixes {
+    pub segment: u8,
+    pub is_movable: bool,
+    pub offset_or_ordinal: u16,
+}
+#[derive(Debug, Clone, Copy)]
+pub struct ImportByOrdinal {
+    pub module_index: u16,
+    pub ordinal: u16,
+}
+#[derive(Debug, Copy, Clone)]
+pub struct ImportByName {
+    pub module_index: u16,
+    pub name_offset: u16,
 }
 
 impl RelocationTable {
@@ -69,31 +75,37 @@ impl RelocationTable {
                     let is_movable = segment == 0xFF;
                     let offset_or_ordinal = u16::from_le_bytes([entry_buf[6], entry_buf[7]]);
                     
-                    RelocationTarget::Internal {
-                        segment,
-                        is_movable,
-                        offset_or_ordinal,
-                    }
+                    let internal_fix: InternalFixes = InternalFixes {
+                        segment: segment,
+                        is_movable: is_movable,
+                        offset_or_ordinal: offset_or_ordinal
+                    };
+
+                    RelocationTarget::Internal(internal_fix)
                 }
                 // Imported by ordinal
                 0x01 => {
                     let module_index = u16::from_le_bytes([entry_buf[4], entry_buf[5]]);
                     let ordinal = u16::from_le_bytes([entry_buf[6], entry_buf[7]]);
                     
-                    RelocationTarget::ImportedOrdinal {
+                    let import_by_odrinal: ImportByOrdinal = ImportByOrdinal {
                         module_index,
                         ordinal,
-                    }
+                    };
+
+                    RelocationTarget::ImportByOrdinal(import_by_odrinal) 
                 }
                 // Imported by name
                 0x02 => {
                     let module_index = u16::from_le_bytes([entry_buf[4], entry_buf[5]]);
                     let name_offset = u16::from_le_bytes([entry_buf[6], entry_buf[7]]);
                     
-                    RelocationTarget::ImportedName {
+                    let import_by_name: ImportByName = ImportByName {
                         module_index,
                         name_offset,
-                    }
+                    };
+
+                    RelocationTarget::ImportByName(import_by_name) 
                 }
                 _ => {
                     return Err(io::Error::new(

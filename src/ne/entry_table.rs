@@ -92,7 +92,7 @@ impl EntryTable {
     pub fn read_sf<R: Read>(r: &mut R, cb_ent_tab: u16) -> io::Result<Self> {
         let mut entries: Vec<SegmentEntry> = Vec::new();
         let mut bytes_remaining = cb_ent_tab;
-        let mut ordinal: u16 = 1; // entry index means ordinal in non/resident names tables
+        let mut _ordinal: u16 = 1; // entry index means ordinal in non/resident names tables
 
         while bytes_remaining > 0 {
             // Read bundle header
@@ -112,7 +112,7 @@ impl EntryTable {
                 // Unused entries (padding between actual entries)
                 for _ in 0..entries_count {
                     entries.push(SegmentEntry::Unused);
-                    ordinal += 1;
+                    _ordinal += 1;
                 }
                 continue;
             }
@@ -140,7 +140,7 @@ impl EntryTable {
                     SegmentEntry::Fixed(FixedSegmentEntry::read(r, seg_id)?)
                 };
                 entries.push(entry);
-                ordinal += 1;
+                _ordinal += 1;
             }
         }
 

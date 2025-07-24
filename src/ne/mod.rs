@@ -9,7 +9,7 @@ use self::resident_name_table::ResidentNameTable;
 use self::resource_table::NeResourceTable;
 use self::segment_table::NeSegment;
 use crate::mz::DosHeader;
-use crate::ne::segment_relocations::RelocationTable;
+use crate::ne::segment_relocations::{RelocationTable, RelocationTarget};
 
 pub mod entry_table;
 pub mod header;
@@ -132,7 +132,7 @@ impl NeExecutable {
         println!("Header:");
         match ne_header.major_linker_version {
             0..3 => {
-                error!("Module made by LINK.EXE {}.{}! Some of details are unsupported!", ne_header.major_linker_version, ne_header.minor_linker_version);
+                error!("Module made by LINK.EXE {}.{}! Image's structures are unsupported!", ne_header.major_linker_version, ne_header.minor_linker_version);
             },
             _ => {
                 println!("LINK.EXE version supported");
@@ -172,45 +172,45 @@ impl NeExecutable {
         }
         println!();
         println!(
-            "    Auto-data segment: {}",
+            "\tAuto-data segment: {}",
             ne_header.auto_data_segment_index.value()
         );
         println!(
-            "    Initial heap size: {}",
+            "\tInitial heap size: {}",
             ne_header.init_heap_size.value()
         );
         println!(
-            "    Initial stack size: {}",
+            "\tInitial stack size: {}",
             ne_header.init_stack_size.value()
         );
         println!(
-            "    Entry point (CS:IP): {:04X}:{:04X}",
+            "\tEntry point (CS:IP): {:04X}:{:04X}",
             ne_header.entry_point.value() >> 16,
             ne_header.entry_point.value() & 0xFFFF
         );
         println!(
-            "    Initial stack (SS:SP): {:04X}:{:04X}",
+            "\tInitial stack (SS:SP): {:04X}:{:04X}",
             ne_header.init_stack.value() >> 16,
             ne_header.init_stack.value() & 0xFFFF
         );
         println!(
-            "    Number of segments: {}",
+            "\tNumber of segments: {}",
             ne_header.segment_count.value()
         );
         println!(
-            "    Number of referenced modules: {}",
+            "\tNumber of referenced modules: {}",
             ne_header.module_references.value()
         );
         println!(
-            "    Number of movable entry points: {}",
+            "\tNumber of movable entry points: {}",
             ne_header.movable_entry_point_count.value()
         );
         println!(
-            "    Number of file alignment shifts: {}",
+            "\tNumber of file alignment shifts: {}",
             ne_header.file_alignment_shift_count.value()
         );
         println!(
-            "    Number of resource table entries: {}",
+            "\tNumber of resource table entries: {}",
             ne_header.resource_table_entries.value()
         );
         
@@ -238,7 +238,7 @@ impl NeExecutable {
 
         for (i, segment) in segment_entries.iter().enumerate() {
             // SEGMENTS TABLE info
-            println!("Segment #{}:", i);
+            println!("Segment #{}:", i + 1);
             println!("\tOffset on file: 0x{:04X}", segment.data_offset());
             println!("\tLength on file: 0x{:04X}", segment.data_length());
             println!("\tFlags: 0x{:04X}", segment.header.flags);
@@ -251,15 +251,34 @@ impl NeExecutable {
             }
 
             for (reloc_index, reloc) in self.relocation_tables_per_segment[i].entries.iter().enumerate() {
-                // println!("\tRELOC\t{:04X}:{:?}", reloc.segment_offset, reloc.target);
-                println!("\tRelocation #{}", reloc_index);
+                println!("--------------------------------------------------");
+                println!("\tRelocation #{}", reloc_index + 1);
                 println!("\t\tATP: 0x{:2X}", reloc.address_type);
                 println!("\t\tRTP: 0x{:2X}", reloc.reloc_type);
                 println!("\t\tAdditive? {}", reloc.is_additive);
                 println!("\t\tSegment offset: 0x{:X}", reloc.segment_offset);
-                println!("\t\tTarget address {:?}", reloc.target);
+                println!("--------------------------------------------------");
+
+                match &reloc.target {
+                    RelocationTarget::Internal(f) => {
+                        println!("\t\tSEG_RELOC_INTERNAL_FIXES");
+                        println!("\t\t#Segment {}", f.segment);
+                        println!("\t\tOffset {:X}", f.offset_or_ordinal);
+                        println!("\t\t.MOVEABLE? {}", f.is_movable);
+                    },
+                    RelocationTarget::ImportByOrdinal(o) => {
+                        println!("SEG_RELOC_IMPORT_BY_ORDINAL");
+                        println!("Procedure: @{}", o.ordinal);
+                        println!("Module# {}", o.module_index);
+                    },
+                    RelocationTarget::ImportByName(n) => {
+                        println!("SEG_RELOC_IMPORT_BY_NAME");
+                        println!("Procedure name offset: {}", n.name_offset);
+                        println!("Module# {}", n.module_index)
+                    }
+                }
                 
-                println!(); // new line
+                println!();
             }
         }
 
@@ -279,7 +298,8 @@ impl NeExecutable {
                 String::from_utf8_lossy(&self.nonresident_name_table.entries[0].name)
             );
         }
-        if !self.resident_name_table.entries.is_empty() {
+        
+        if !self.resident_name_table.entries.len() > 1 {
             println!("Resident names:");
             for entry in &self.resident_name_table.entries[1..] {
                 println!(
@@ -289,7 +309,7 @@ impl NeExecutable {
                 );
             }
         }
-        if !self.nonresident_name_table.entries.is_empty() {
+        if !self.nonresident_name_table.entries.len() > 1 {
             println!("Nonresident names:");
             for entry in &self.nonresident_name_table.entries[1..] {
                 println!(
@@ -309,19 +329,19 @@ impl NeExecutable {
             use self::entry_table::SegmentEntry::*;
             match entry {
                 Unused => {
-                    println!("Entry #{}: unused", i + 1);
+                    println!("Entry #{}: .UNUSED", i + 1);
                 }
                 Fixed(entry) => {
-                    println!("Entry #{}: fixed", i + 1);
+                    println!("Entry #{}: .FIXED", i + 1);
                     println!("\tSegment: {}", entry.segment);
                     println!("\tFlags: 0x{:02X}", entry.flags);
                     println!("\tOffset: 0x{:04X}", entry.offset);
                 }
                 Moveable(entry) => {
-                    println!("Entry #{}: moveable", i + 1);
+                    println!("Entry #{}: .MOVEABLE", i + 1);
                     println!("\tFlags: 0x{:02X}", entry.flags);
                     if entry.magic != *b"\xCD\x3F" { // movable entry must have INT 3Fh instruction.
-                        println!(
+                        error!(
                             "\t<Invalid magic>: {:02X} {:02X}",
                             entry.magic[0], entry.magic[1]
                         );
@@ -332,21 +352,28 @@ impl NeExecutable {
             }
         }
 
-        for (_i, segment) in segment_entries.iter().enumerate() {
-            if !disassemble || (segment.header.flags & 7) != 0 {
+        // TODO: .ITERATED segments .DATA segments
+
+        for (_, segment) in segment_entries.iter().enumerate() {
+            // if segment has SEG_MASK flag (0x07), .CODE segments must be processed too.
+            // see Microsoft Segmented EXE (New executable) Format sources or Wine-VDM sources
+            // https://github.com/AlexeyTolstopyatov/old-executables-documentation
+
+            if !disassemble || (segment.header.flags & 7) != 0 { // mask
                 continue;
             }
             if let Some(data) = &segment.data {
                 crate::x86::disassemble(data, false);
             }
         }
-
+        
+        // HEXadecimal view for each segment
         for (i, segment) in segment_entries.iter().enumerate() {
             if !show_data {
                 continue;
             }
             if let Some(data) = &segment.data {
-                println!("Segment #{} data:", i);
+                println!("Segment #{} view:", i + 1);
                 for (i, chunk) in data.chunks(16).enumerate() {
                     print!("{:08X} ", i * 16);
                     for j in 0..16 {
