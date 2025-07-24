@@ -359,67 +359,97 @@ impl NeExecutable {
                 // see Microsoft Segmented EXE (New executable) Format sources or Wine-VDM
                 // https://github.com/AlexeyTolstopyatov/old-executables-documentation
 
-                if let Some(data) = &segment.data {
-                    // Borland C/++ notation. not Unix
-                    let (segment_type, is_data) = match segment.header.flags & 0x0001 != 0 {
-                        true => (".DATA", true),
-                        false => (".CODE", false)
-                    };
+                match &segment.data {
+                    Some(data) => {
+                        let (segment_type, is_data) = match segment.header.flags & 0x0001 != 0 {
+                            true => (".DATA", true),
+                            false => (".CODE", false)
+                        };
+                        if segment.header.flags & 0x07 != 0 { // has mask
+                            println!("\tSEG_HAS_MASK");
+                        }
+                        let (segment_compressed, is_iterated) = match segment.header.flags & 0x0002 != 0 {
+                            true => {
+                                (".ITERATED", true)
+                            },
+                            false => ("normal", false) // do nothing
+                        };
 
-                    if segment.header.flags & 0x07 != 0 { // has mask
-                        println!("\tSEG_HAS_MASK");
+                        println!("Segment #{} {} [{}]", segment_index + 1, segment_type, segment_compressed);
+                        
+                        define_disassemble(data, segment_type, is_data, is_iterated);
                     }
-                    
-                    let segment_compressed = match segment.header.flags & 0x0002 != 0 {
-                        true => {
-                            // process bytes slice before disasm procedure call
-                            ".ITERATED"
-                        },
-                        false => "normal" // do nothing
-                    };
-
-                    println!("Segment #{} {} [{}]", segment_index + 1, segment_type, segment_compressed);
-                    match is_data {
-                        true => println!("\tSkipped!"),
-                        false => crate::x86::disassemble(data, false, segment_type)
-                    }
+                    None => (),
                 }
             }
         }
-
-        // HEXadecimal view for each segment
-        for (i, segment) in segment_entries.iter().enumerate() {
-            if !show_data {
-                continue;
-            }
-            if let Some(data) = &segment.data {
-                println!("Segment #{} view:", i + 1);
-                for (i, chunk) in data.chunks(16).enumerate() {
-                    print!("{:08X} ", i * 16);
-                    for j in 0..16 {
-                        if let Some(x) = chunk.get(j) {
-                            print!(" {:02X}", x);
-                        } else {
-                            print!("   ");
+        if show_data {
+            // HEXadecimal view for each segment
+            for (i, segment) in segment_entries.iter().enumerate() {
+                let segment_type = match segment.header.flags & 0x0001 != 0 {
+                    true => ".DATA",
+                    false => ".CODE"
+                };
+                if let Some(data) = &segment.data {
+                    println!("Segment #{} {} view:", i + 1, segment_type);
+                    for (i, chunk) in data.chunks(16).enumerate() {
+                        print!("{:08X} ", i * 16);
+                        for j in 0..16 {
+                            if let Some(x) = chunk.get(j) {
+                                print!(" {:02X}", x);
+                            } else {
+                                print!("   ");
+                            }
+                            if j == 7 {
+                                print!(" ");
+                            }
                         }
-                        if j == 7 {
-                            print!(" ");
+                        print!("  |");
+                        for &byte in chunk {
+                            if 0x20 <= byte && byte < 0x7F {
+                                print!("{}", byte as char);
+                            } else {
+                                print!(".");
+                            }
                         }
+                        print!("|");
+                        println!();
                     }
-                    print!("  |");
-                    for &byte in chunk {
-                        if 0x20 <= byte && byte < 0x7F {
-                            print!("{}", byte as char);
-                        } else {
-                            print!(".");
-                        }
-                    }
-                    print!("|");
+                    println!("{:08X}", (data.len() + 15) / 16 * 16);
                     println!();
                 }
-                println!("{:08X}", (data.len() + 15) / 16 * 16);
-                println!();
             }
         }
     }
+}
+///
+/// Defines segment's storage type by flags in segment's header
+/// and call disassemble procedure
+/// 
+fn define_disassemble(data: &Vec<u8>, segment_type: &'static str, is_data: bool, is_iterated: bool) {
+    match is_data {
+        true => println!("\tSkipped!"),
+        false => {
+            match !is_iterated {
+                true => crate::x86::disassemble(data, false, segment_type),
+                false => crate::x86::disassemble(&iter_segment_bytes(data), false, segment_type)
+            }
+        }
+    }
+}
+///
+/// If file segment has SEG_ITERATED flag,
+/// it means that data compressed. 
+/// 
+/// Segmented EXE headedr Format doesn't tells: how actually compressed
+/// This procedure is my suggestions how it may be. 
+/// 
+/// \param data -- compressed bytes slice
+///
+fn iter_segment_bytes(data: &[u8]) -> Vec<u8> {
+    let iterations = u16::from_le_bytes([data[0], data[1]]);
+    let data_size = u16::from_le_bytes([data[2], data[3]]);
+    let raw_data = &data[4..4 + data_size as usize];
+    
+    raw_data.repeat(iterations as usize)
 }
