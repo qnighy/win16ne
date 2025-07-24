@@ -139,7 +139,7 @@ impl NeExecutable {
             }
         }
         println!(
-            "\tLINK.EXE version: {}.{}",
+            "\tLINK.EXE {}.{}",
             ne_header.major_linker_version, ne_header.minor_linker_version
         );
         print!("\tFlags: ");
@@ -167,7 +167,7 @@ impl NeExecutable {
                 }
             }
             if !flag_found {
-                print!("0");
+                error!("No program flags");
             }
         }
         println!();
@@ -214,7 +214,7 @@ impl NeExecutable {
             ne_header.resource_table_entries.value()
         );
         
-        print!("    Target os: ");
+        print!("\tTarget OS: ");
         match ne_header.target_os {
             0x0 => print!("Not specified"),
             0x1 => print!("OS/2"),
