@@ -353,20 +353,40 @@ impl NeExecutable {
         }
 
         // TODO: .ITERATED segments .DATA segments
+        if disassemble {
+            for (segment_index, segment) in segment_entries.iter().enumerate() {
+                // if segment has SEG_MASK flag (0x07), .CODE segments must be processed too.
+                // see Microsoft Segmented EXE (New executable) Format sources or Wine-VDM
+                // https://github.com/AlexeyTolstopyatov/old-executables-documentation
 
-        for (_, segment) in segment_entries.iter().enumerate() {
-            // if segment has SEG_MASK flag (0x07), .CODE segments must be processed too.
-            // see Microsoft Segmented EXE (New executable) Format sources or Wine-VDM sources
-            // https://github.com/AlexeyTolstopyatov/old-executables-documentation
+                if let Some(data) = &segment.data {
+                    // Borland C/++ notation. not Unix
+                    let (segment_type, is_data) = match segment.header.flags & 0x0001 != 0 {
+                        true => (".DATA", true),
+                        false => (".CODE", false)
+                    };
 
-            if !disassemble || (segment.header.flags & 7) != 0 { // mask
-                continue;
-            }
-            if let Some(data) = &segment.data {
-                crate::x86::disassemble(data, false);
+                    if segment.header.flags & 0x07 != 0 { // has mask
+                        println!("\tSEG_HAS_MASK");
+                    }
+                    
+                    let segment_compressed = match segment.header.flags & 0x0002 != 0 {
+                        true => {
+                            // process bytes slice before disasm procedure call
+                            ".ITERATED"
+                        },
+                        false => "normal" // do nothing
+                    };
+
+                    println!("Segment #{} {} [{}]", segment_index + 1, segment_type, segment_compressed);
+                    match is_data {
+                        true => println!("\tSkipped!"),
+                        false => crate::x86::disassemble(data, false, segment_type)
+                    }
+                }
             }
         }
-        
+
         // HEXadecimal view for each segment
         for (i, segment) in segment_entries.iter().enumerate() {
             if !show_data {

@@ -1,6 +1,6 @@
 use std::fmt;
 
-pub fn disassemble(code: &[u8], is_32: bool) {
+pub fn disassemble(code: &[u8], is_32: bool, segment_type: &str) {
     let mut insts = Vec::new();
     let mut pos = 0;
     while pos < code.len() {
@@ -10,7 +10,7 @@ pub fn disassemble(code: &[u8], is_32: bool) {
         insts.push(inst);
     }
 
-    println!("0000:0000 <CODE>:"); // <-- Borland C/++ notation.
+    println!("0000:0000 <{}>:", segment_type);
     for inst in &insts {
         let pos = inst.pos;
         let len = inst.len();
