@@ -1,5 +1,9 @@
 use std::io::{self, Read, Seek, SeekFrom};
-
+///
+/// The module reference table contains 2 bytes for every external module
+/// the program uses. These 2 bytes are an offset into the imported names
+/// table.
+/// 
 #[derive(Debug, Clone)]
 pub struct ModuleReferenceTable {
     pub entries: Vec<ModuleReferenceEntry>,

@@ -1,7 +1,7 @@
 [package]
 name = "win16ne"
-version = "0.1.0"
-authors = ["Masaki Hara <ackie.h.gmai@gmail.com>"]
+version = "0.1.1"
+authors = ["Masaki Hara <ackie.h.gmai@gmail.com>", "Alexey Tolstopyatov <atolstopyatov2017@vk.com>"]
 edition = "2021"
 license = "MIT OR Apache-2.0"
 

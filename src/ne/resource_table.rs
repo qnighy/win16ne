@@ -1,6 +1,20 @@
 use std::convert::TryInto;
 use std::io::{self, Read};
-
+///
+/// Resources are segments that contain data but 
+/// are not included in a program's normal data segments. 
+/// 
+/// Resources are commonly used in Windows
+/// programs to store menus, dialog-box templates, icons, cursors, and
+/// text strings, but they can also be used for any type of read-only
+/// data. 
+/// Each resource has a type and a name, both of which can be
+/// represented by either a number or an ASCII name.
+/// 
+/// The resource table begins with a resource shift count used for
+/// adjusting other values in the table. (Offsets are from the beginning
+/// of the table.)
+///
 #[derive(Debug, Clone)]
 pub struct NeResourceTable {
     pub header: NeResourceTableHeader,

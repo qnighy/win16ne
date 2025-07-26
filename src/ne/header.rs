@@ -5,6 +5,8 @@ use bytemuck::{Pod, Zeroable};
 use crate::util::endian::{Lu16, Lu32};
 
 /// The New Executable header.
+/// Data structure which deserializes from binary
+/// 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Pod, Zeroable)]
 #[repr(C)]
 pub struct NeHeader {
@@ -60,7 +62,9 @@ mod tests {
     use std::io::Cursor;
 
     use super::*;
-
+    ///
+    /// Common view of data without CPU specific
+    /// (data not depends on endianness)
     #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
     pub struct NeHeader2 {
         pub magic: [u8; 2],
